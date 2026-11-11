@@ -35,6 +35,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
@@ -53,8 +54,14 @@ class EngineController @Inject constructor(
     private val dumbRepository: IDumbRepository,
 ) {
 
-    /** All the scenarios stored in the database, ordered by name. */
+    /**
+     * All the scenarios stored in the database, the most recent first.
+     *
+     * The database returns them by name; the id is the insertion order, so sorting on it keeps the template that was
+     * just recorded on top of the list, in the app and in the panel's picker.
+     */
     val scenarios: Flow<List<DumbScenario>> = dumbRepository.dumbScenarios
+        .map { storedScenarios -> storedScenarios.sortedByDescending { scenario -> scenario.id.databaseId } }
 
     /** True while a scenario is being played. */
     val isRunning: StateFlow<Boolean> = dumbEngine.isRunning

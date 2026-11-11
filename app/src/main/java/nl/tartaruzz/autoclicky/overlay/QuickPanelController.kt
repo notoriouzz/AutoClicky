@@ -391,8 +391,7 @@ class QuickPanelController @Inject constructor(
             service = service,
             summary = recording.summary,
             recordingName = defaultRecordingName(),
-            initialRepeat = engineController.repeatSetting.value,
-            onSave = { repeat -> saveRecording(recording, repeat) },
+            onSave = { saveRecording(recording) },
             onCancel = {
                 saveOverlay?.dismiss()
                 saveOverlay = null
@@ -409,7 +408,7 @@ class QuickPanelController @Inject constructor(
         applyState()
     }
 
-    private fun saveRecording(recording: CompletedRecording, repeat: RepeatSetting) {
+    private fun saveRecording(recording: CompletedRecording) {
         saveOverlay?.dismiss()
         saveOverlay = null
         applyState()
@@ -417,6 +416,8 @@ class QuickPanelController @Inject constructor(
         val templateName = defaultRecordingName()
 
         scope.launch {
+            // A new template plays once; the repeat is chosen with the ×N button when it is played.
+            val repeat = RepeatSetting.SINGLE
             engineController.setRepeatSetting(repeat)
 
             val scenarioId = try {
@@ -430,13 +431,10 @@ class QuickPanelController @Inject constructor(
             if (scenarioId == null) {
                 showMessage("Could not save the recording")
             } else {
-                showMessage("Saved: $templateName${repeat.suffix()}")
+                showMessage("Saved: $templateName (${recording.summary})")
             }
         }
     }
-
-    /** " · 5×" for a repeated template, nothing for a single pass. */
-    private fun RepeatSetting.suffix(): String = if (isSingleRun) "" else " · $label"
 
     private fun onHideClicked() {
         isVisibleRequested = false

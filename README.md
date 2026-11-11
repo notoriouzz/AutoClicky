@@ -9,6 +9,9 @@ template library are specific to AutoClicky.
 
 > AutoClicky is licensed under the **GNU GPL v3.0 or later** — see [`LICENSE`](LICENSE).
 
+> **New here?** Read the **[user guide](USER_GUIDE.md)**: the difference between the two REC modes, saving a macro and
+> making it run 1×, 5× or endlessly.
+
 ## Features
 
 - **Record taps while you keep using your apps** — a pass-through watcher window captures the taps you make on other
@@ -16,8 +19,9 @@ template library are specific to AutoClicky.
 - **Floating panel above every app** — a small draggable **REC / STOP / PLAY / ×N / LIST / X** bar
   (`TYPE_ACCESSIBILITY_OVERLAY`) stays on top of the app you are using: record a macro, stop it, save it on the spot, and
   replay any stored template — all without going back to AutoClicky. It appears on its own while a template is playing.
-- **Save where you are** — as soon as a recording ends, a **Save recording** card opens above the current app: pick how
-  often the macro must repeat, then tap **SAVE**. One tap stores it and **PLAY** replays it.
+- **Save where you are** — as soon as a recording ends, a **Save recording** card opens above the current app: it shows
+  what was captured (*12 taps*, *1 gesture*) and a large **SAVE** / **DISCARD**. One tap stores it and **PLAY** replays
+  it. The repeat is not asked there: a new template plays once, set it with **×N** when you play it.
 - **Repeat** — play a macro once, 3×, 5×, 10×, 50× or endlessly until you press STOP or touch the screen, with a pause
   between the passes. The choice is stored in the template.
 - **Templates** — every recording is stored in a Room database and listed in the app, where it can be renamed or
@@ -137,8 +141,9 @@ draggable bar with **REC / STOP / PLAY / ×N / LIST / X** then stays above every
    long press, multi finger) the template must replay, then press **STOP**. The banner says *Recording GESTURES*, and the
    app underneath cannot be used while this mode is active (the overlay swallows the touches).
 3. The **Save recording** card opens immediately, above the app you are in: it shows what was captured (*12 taps* or
-   *3 gestures*), the repeat choices and a large **SAVE** / **DISCARD**. No keyboard is needed, so the card never gets
-   stuck behind it. The template is stored right away and **PLAY replays it**, without opening AutoClicky.
+   *3 gestures*) and a large **SAVE** / **DISCARD**. No keyboard is needed, so the card never gets stuck behind it. The
+   template is stored right away and **PLAY replays it**, without opening AutoClicky. A new template plays **once**; set
+   the repeat with **×N** when you play it.
 4. **PLAY** — replays the template that was played last (the first one when none was played yet) above the app you are
    in.
 5. **LIST** — opens the template list above the current app: tap a row (or its ▶) to play that template.
