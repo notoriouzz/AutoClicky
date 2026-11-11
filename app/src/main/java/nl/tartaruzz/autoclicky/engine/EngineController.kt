@@ -1,4 +1,4 @@
-/*
+tor/*
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
  * Copyright (C) 2026 AutoClicky contributors
@@ -59,9 +59,10 @@ class EngineController @Inject constructor(
     private val _lastStartedScenarioId = MutableStateFlow<Long?>(null)
 
     /**
-     * Database id of the last scenario that was started, kept in memory only.
+     * Database id of the last scenario that was started or created, kept in memory only.
      *
-     * The floating panel uses it to replay the same template without opening the activity.
+     * The floating panel uses it to replay the same template without opening the activity, and setting it on insertion
+     * makes the PLAY button replay the recording that was just saved.
      */
     val lastStartedScenarioId: StateFlow<Long?> = _lastStartedScenarioId
 

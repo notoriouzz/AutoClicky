@@ -1,4 +1,4 @@
-/*
+tor/*
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
  * Copyright (C) 2026 AutoClicky contributors
@@ -72,7 +72,10 @@ class SaveRecordingOverlay(
             PixelFormat.TRANSLUCENT,
         ).apply {
             gravity = Gravity.CENTER
-            softInputMode = WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
+            // An overlay window is not resized by the system when the keyboard opens: raising it instead keeps the
+            // buttons above the keyboard, which would otherwise hide them and leave the card blocking the screen.
+            softInputMode = WindowManager.LayoutParams.SOFT_INPUT_ADJUST_PAN or
+                WindowManager.LayoutParams.SOFT_INPUT_STATE_UNCHANGED
         }
 
         val added = try {
@@ -109,6 +112,7 @@ class SaveRecordingOverlay(
         val root = FrameLayout(service).apply {
             setBackgroundColor(SCRIM_COLOR)
             isClickable = true // Swallows the touches made outside of the card.
+            setOnClickListener { onCancel() } // Always a way out: a touch outside the card cancels.
         }
 
         val card = LinearLayout(service).apply {
@@ -116,10 +120,15 @@ class SaveRecordingOverlay(
             setPadding(toPx(20), toPx(18), toPx(20), toPx(14))
             background = roundedBackground(CARD_COLOR, 20)
             minimumWidth = toPx(280)
+            // Anchored in the upper part of the screen: the keyboard never covers the buttons of an overlay window.
             layoutParams = FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.WRAP_CONTENT,
                 FrameLayout.LayoutParams.WRAP_CONTENT,
-            ).apply { gravity = Gravity.CENTER }
+            ).apply {
+                gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
+                topMargin = toPx(CARD_TOP_MARGIN_DP)
+            }
+            isClickable = true // Keeps the touches made on the card from cancelling it.
         }
 
         card.addView(
@@ -164,6 +173,15 @@ class SaveRecordingOverlay(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT,
             ).apply { topMargin = toPx(14) }
+            // The "done" key of the keyboard saves too, whatever the keyboard does to the layout.
+            setOnEditorActionListener { _, actionId, _ ->
+                if (actionId == EditorInfo.IME_ACTION_DONE) {
+                    onSave(currentName())
+                    true
+                } else {
+                    false
+                }
+            }
         }.also { field -> nameField = field }
 
     private fun buildButtons(): LinearLayout =
@@ -239,5 +257,6 @@ class SaveRecordingOverlay(
         const val SUBTITLE_TEXT_SIZE_SP = 12f
         const val FIELD_TEXT_SIZE_SP = 15f
         const val BUTTON_TEXT_SIZE_SP = 14f
+        const val CARD_TOP_MARGIN_DP = 88
     }
 }

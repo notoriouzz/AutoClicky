@@ -289,8 +289,8 @@ class QuickPanelController @Inject constructor(
         val overlay = SaveRecordingOverlay(
             service = service,
             actionCount = recording.actions.size,
-            defaultName = defaultRecordingName(),
-            onSave = { name -> saveRecording(recording, name) },
+            recordingName = defaultRecordingName(),
+            onSave = { saveRecording(recording) },
             onCancel = {
                 saveOverlay?.dismiss()
                 saveOverlay = null
@@ -304,12 +304,13 @@ class QuickPanelController @Inject constructor(
         }
     }
 
-    private fun saveRecording(recording: CompletedRecording, name: String) {
+    private fun saveRecording(recording: CompletedRecording) {
         saveOverlay?.dismiss()
         saveOverlay = null
 
+        val templateName = defaultRecordingName()
+
         scope.launch {
-            val templateName = name.trim().ifEmpty { defaultRecordingName() }
             val scenarioId = engineController.addScenario(DumbScenarioBuilder.build(templateName, recording.actions))
             recordingController.consumeCompletedRecording()
 
