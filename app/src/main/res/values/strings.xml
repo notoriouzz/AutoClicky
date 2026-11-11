@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">AutoClicky</string>
+    <string name="accessibility_service_description">Allows AutoClicky to perform taps and gestures on your behalf. AutoClicky does not read screen content.</string>
+</resources>

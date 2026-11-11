@@ -1,0 +1,120 @@
+/*
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ *
+ * Copyright (C) 2026 AutoClicky contributors
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
+package nl.tartaruzz.autoclicky.engine
+
+import com.buzbuz.smartautoclicker.core.dumb.domain.IDumbRepository
+import com.buzbuz.smartautoclicker.core.dumb.domain.model.DumbScenario
+import com.buzbuz.smartautoclicker.core.dumb.engine.DumbEngine
+
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
+import javax.inject.Inject
+import javax.inject.Singleton
+
+/**
+ * Single entry point to drive the vendored Smart AutoClicker (Klick'r) dumb engine.
+ *
+ * Both the accessibility service, the activity and (later) the recorder control the engine through this façade, so the
+ * engine lifecycle stays consistent: a scenario can only be started once the accessibility service has initialized the
+ * gesture executor.
+ */
+@Singleton
+class EngineController @Inject constructor(
+    private val dumbEngine: DumbEngine,
+    private val dumbRepository: IDumbRepository,
+) {
+
+    /** All the scenarios stored in the database, ordered by name. */
+    val scenarios: Flow<List<DumbScenario>> = dumbRepository.dumbScenarios
+
+    /** True while a scenario is being played. */
+    val isRunning: StateFlow<Boolean> = dumbEngine.isRunning
+
+    /** The scenario currently played, if any. */
+    val runningScenario: Flow<DumbScenario?> = dumbEngine.dumbScenario
+
+    private val _isAccessibilityServiceConnected = MutableStateFlow(false)
+
+    /** True when the accessibility service is connected, which is required to execute any gesture. */
+    val isAccessibilityServiceConnected: StateFlow<Boolean> = _isAccessibilityServiceConnected
+
+    fun onAccessibilityServiceConnected() {
+        _isAccessibilityServiceConnected.value = true
+    }
+
+    fun onAccessibilityServiceDisconnected() {
+        _isAccessibilityServiceConnected.value = false
+        dumbEngine.release()
+    }
+
+    /**
+     * Persist a new scenario.
+     *
+     * @return the database id of the inserted scenario, or null if it could not be found after the insertion.
+     */
+    suspend fun addScenario(scenario: DumbScenario): Long? {
+        val knownIds = dumbRepository.dumbScenarios.first().map { it.id.databaseId }.toSet()
+
+        dumbRepository.addDumbScenario(scenario)
+
+        return dumbRepository.dumbScenarios.first()
+            .firstOrNull { storedScenario -> storedScenario.id.databaseId !in knownIds }
+            ?.id?.databaseId
+    }
+
+    /**
+     * Start the scenario with the provided database id. Returns false if it can't be started.
+     */
+    suspend fun startScenario(scenarioDbId: Long): Boolean {
+        if (!_isAccessibilityServiceConnected.value) return false
+
+        val scenario = dumbRepository.getDumbScenario(scenarioDbId) ?: return false
+        if (!scenario.isValid()) return false
+
+        dumbEngine.init(scenario)
+        dumbEngine.startDumbScenario()
+        return true
+    }
+
+    fun stopScenario() {
+        dumbEngine.stopDumbScenario()
+    }
+
+    /** Rename a stored scenario. No-op when the new name is blank or unchanged. */
+    suspend fun renameScenario(scenario: DumbScenario, newName: String) {
+        val trimmedName = newName.trim()
+        if (trimmedName.isEmpty() || trimmedName == scenario.name) return
+
+        dumbRepository.updateDumbScenario(scenario.copy(name = trimmedName))
+    }
+
+    /** Store a copy of [scenario] under [copyName]. */
+    fun duplicateScenario(scenario: DumbScenario, copyName: String = "${scenario.name} (copy)") {
+        dumbRepository.addDumbScenarioCopy(scenario.id.databaseId, copyName) { /* The scenario flow refreshes itself. */ }
+    }
+
+    suspend fun deleteScenario(scenario: DumbScenario) {
+        if (dumbEngine.isRunning.value) return
+
+        dumbRepository.deleteDumbScenario(scenario)
+    }
+}
