@@ -1,0 +1,2 @@
+# AutoClicky
+Auto Clicker
