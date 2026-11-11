@@ -134,6 +134,17 @@ draggable bar with **REC / STOP / PLAY / LIST / X** then stays above every other
 3. **PLAY** — replays the template that was played last (the first one when none was played yet) above the app you are
    in.
 4. **LIST** — opens the template list above the current app: tap a row (or its ▶) to play that template.
+5. **×N** — opens the **Repeat** card for the last template: choose how many times it must be played
+   (1× / 3× / 5× / 10× / 50× / **∞**) and how long the engine waits between two passes (0 s / 0.5 s / 1 s / 3 s / 10 s),
+   then press **PLAY**. The choice is stored in the template itself, so the next **PLAY** (from the panel or from the
+   app) uses the same repeat. The button label always shows the current choice (`5×`, `∞`).
+
+An endless template (`∞`) runs until **STOP** is pressed or until you **touch the screen**: while it runs, a one pixel
+pass-through watcher stops it on the first real finger touch. The gestures the engine injects itself are ignored (they
+carry no tool type, unlike a real touch), and so are the touches on the AutoClicky panel and cards.
+
+A repeat needs a pause between the passes for most apps: two taps 50 ms apart are usually collapsed by the target app —
+set at least `0.5 s`/`1 s` when the template ends on a button of a calculator or of a form.
 
 **STOP** stops a recording or a running template, **X** hides the panel for the current run. While a template runs, the
 panel stays visible (with the running template's name in the list) so it can be stopped from any app.
@@ -160,12 +171,19 @@ GestureRecordingOverlay (full screen MotionEvent capture)─┘                 
 
 - Android delivers exactly one `ACTION_OUTSIDE` per gesture made outside the watcher window (and the underlying app
   still receives the touch), which is why the live mode can only record taps.
+- The position of a tap comes from the accessibility click event of the view that received it: `ACTION_OUTSIDE` reports
+  no coordinates at all on several devices (Samsung reports `0,0` for every touch). Both sources are paired when the
+  capture ends, one action per gesture, so a fast sequence keeps every tap instead of collapsing into one.
+- The service declares `android:notificationTimeout="0"`: with a non zero value, the system aggregates the click events
+  of the same window during that window and only the last one of a burst is delivered — a fast recording then produced a
+  single action.
 - Full gestures are captured from a touchable accessibility overlay, then converted into the engine model:
   `DumbAction.DumbClick` for taps, `DumbAction.DumbGesture` with `DumbGestureFinger`s (`Press`/`Move`/`Wait`/`Release`)
   for everything else. Actions keep their order through `priority`, and the idle time between two actions is stored as
   the previous action's `repeatDelayMs`.
-- Recorded templates play a single pass (`repeatCount = 1`, finite), unlike the quick-test scenario which clicks until
-  stopped.
+- A template stores its own repeat in the `dumb_scenario` table (`repeatCount`, `isRepeatInfinite`); the pause between
+  two passes is the `repeatDelayMs` of the last action, because the engine waits that delay after each action it
+  executes. Templates recorded before 1.2.4 keep playing a single pass.
 
 ## Project structure
 

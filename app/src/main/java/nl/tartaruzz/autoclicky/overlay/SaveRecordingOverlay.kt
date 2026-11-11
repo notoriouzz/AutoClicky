@@ -31,6 +31,8 @@ import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
 
+import nl.tartaruzz.autoclicky.engine.RepeatSetting
+
 import kotlin.math.roundToInt
 
 /**
@@ -47,13 +49,17 @@ class SaveRecordingOverlay(
     private val service: AccessibilityService,
     private val actionCount: Int,
     private val recordingName: String,
-    private val onSave: () -> Unit,
+    private val initialRepeat: RepeatSetting,
+    private val onSave: (RepeatSetting) -> Unit,
     private val onCancel: () -> Unit,
 ) {
 
     private val windowManager: WindowManager? = service.getSystemService(WindowManager::class.java)
 
     private var rootView: FrameLayout? = null
+
+    /** What the user chose in the two chip rows; it starts on the setting used last. */
+    private var repeatSetting: RepeatSetting = initialRepeat.sanitized()
 
     /** Attach the card. Returns false when the window manager refused the window. */
     fun show(): Boolean {
@@ -153,10 +159,60 @@ class SaveRecordingOverlay(
             }
         )
 
+        card.addView(buildRepeatRows())
         card.addView(buildButtons())
         root.addView(card)
         return root
     }
+
+    /** The two chip rows: one pass or many, and the idle time before the next pass. */
+    private fun buildRepeatRows(): LinearLayout =
+        LinearLayout(service).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+            ).apply { topMargin = toPx(14) }
+
+            addView(sectionLabel("Repeat"))
+            addView(
+                buildChipRow(
+                    service = service,
+                    labels = REPEAT_LABELS,
+                    selectedIndex = REPEAT_LABELS.indexOf(repeatSetting.label).coerceAtLeast(0),
+                    onSelected = { index ->
+                        val isInfinite = index == REPEAT_LABELS.lastIndex
+                        repeatSetting = repeatSetting.copy(
+                            repeatCount = if (isInfinite) repeatSetting.repeatCount else REPEAT_COUNTS[index],
+                            isRepeatInfinite = isInfinite,
+                        )
+                    },
+                )
+            )
+
+            addView(sectionLabel("Pause between passes"))
+            addView(
+                buildChipRow(
+                    service = service,
+                    labels = LOOP_DELAY_LABELS,
+                    selectedIndex = LOOP_DELAYS.indexOf(repeatSetting.loopDelayMs).coerceAtLeast(0),
+                    onSelected = { index ->
+                        repeatSetting = repeatSetting.copy(loopDelayMs = LOOP_DELAYS[index])
+                    },
+                )
+            )
+        }
+
+    private fun sectionLabel(text: String): TextView =
+        TextView(service).apply {
+            this.text = text
+            setTextColor(MUTED_TEXT_COLOR)
+            textSize = SUBTITLE_TEXT_SIZE_SP
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+            ).apply { topMargin = toPx(8) }
+        }
 
     private fun buildButtons(): LinearLayout =
         LinearLayout(service).apply {
@@ -177,7 +233,7 @@ class SaveRecordingOverlay(
                 actionButton(
                     label = "SAVE",
                     backgroundColor = SAVE_COLOR,
-                    onClick = { onSave() },
+                    onClick = { onSave(repeatSetting) },
                 )
             )
         }
@@ -217,6 +273,12 @@ class SaveRecordingOverlay(
         val DISCARD_COLOR: Int = Color.parseColor("#FF3A3A40")
         val SAVE_COLOR: Int = Color.parseColor("#FF2E7D32")
         val MUTED_TEXT_COLOR: Int = Color.parseColor("#B3FFFFFF")
+
+        /** Repeat chips: the last one is the endless run, stopped from the panel or by touching the screen. */
+        val REPEAT_COUNTS: List<Int> = RepeatSetting.COUNT_CHOICES
+        val REPEAT_LABELS: List<String> = REPEAT_COUNTS.map { count -> "${count}×" } + RepeatSetting.INFINITE_LABEL
+        val LOOP_DELAYS: List<Long> = RepeatSetting.LOOP_DELAY_CHOICES
+        val LOOP_DELAY_LABELS: List<String> = listOf("0s", "0.5s", "1s", "3s", "10s")
 
         const val CARD_WIDTH_RATIO = 0.9f
         const val CARD_BOTTOM_MARGIN_DP = 56

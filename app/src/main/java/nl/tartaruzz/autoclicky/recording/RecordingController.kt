@@ -28,8 +28,6 @@ import kotlinx.coroutines.flow.StateFlow
 import javax.inject.Inject
 import javax.inject.Singleton
 
-import kotlin.math.abs
-
 /**
  * Drives the recording overlays and exposes the finished recording to the UI.
  *
@@ -55,7 +53,15 @@ class RecordingController @Inject constructor() {
     private var gestureOverlay: GestureRecordingOverlay? = null
 
     private var strokeCollector: StrokeCollector? = null
-    private val tapActions = mutableListOf<RecordedAction.Tap>()
+
+    /** True while [TapRecordingOverlay] is running, false while the gesture overlay is. */
+    private var isTapCapture: Boolean = false
+
+    /** Positions reported by the outside touch watcher, one per gesture. */
+    private val watcherTaps = mutableListOf<RecordedTouch>()
+
+    /** Taps reported by the accessibility click events, with the bounds of the view that received them. */
+    private val viewClicks = mutableListOf<RecordedViewClick>()
 
     fun attach(service: AccessibilityService) {
         this.service = service
@@ -72,7 +78,7 @@ class RecordingController @Inject constructor() {
         val service = service ?: return false
         if (_isRecording.value) return false
 
-        tapActions.clear()
+        clearTaps()
 
         val overlay = TapRecordingOverlay(
             service = service,
@@ -82,6 +88,7 @@ class RecordingController @Inject constructor() {
         overlay.start()
 
         tapOverlay = overlay
+        isTapCapture = true
         _isRecording.value = true
         return true
     }
@@ -91,7 +98,7 @@ class RecordingController @Inject constructor() {
         val service = service ?: return false
         if (_isRecording.value) return false
 
-        tapActions.clear()
+        clearTaps()
 
         val collector = StrokeCollector()
         val overlay = GestureRecordingOverlay(
@@ -103,6 +110,7 @@ class RecordingController @Inject constructor() {
 
         strokeCollector = collector
         gestureOverlay = overlay
+        isTapCapture = false
         _isRecording.value = true
         return true
     }
@@ -118,13 +126,14 @@ class RecordingController @Inject constructor() {
         gestureOverlay?.stop()
         gestureOverlay = null
 
-        val actions = if (tapActions.isNotEmpty()) {
-            ScenarioRecorder.tapsToRecordedActions(tapActions.toList())
+        val taps = mergedTaps()
+        val actions = if (taps.isNotEmpty()) {
+            ScenarioRecorder.tapsToRecordedActions(taps)
         } else {
             ScenarioRecorder.toRecordedActions(strokeCollector?.getStrokes().orEmpty())
         }
 
-        tapActions.clear()
+        clearTaps()
         strokeCollector = null
 
         if (actions.isNotEmpty()) {
@@ -145,7 +154,7 @@ class RecordingController @Inject constructor() {
      * (Samsung reports 0,0), while the click event carries the screen bounds of the view that was clicked.
      */
     fun onViewClicked(event: AccessibilityEvent) {
-        if (!_isRecording.value) return
+        if (!_isRecording.value || !isTapCapture) return
 
         val source = event.source ?: return
         val bounds = Rect()
@@ -159,44 +168,36 @@ class RecordingController @Inject constructor() {
 
         if (bounds.isEmpty) return
 
-        addTap(bounds.exactCenterX(), bounds.exactCenterY(), event.eventTime, fromView = true)
+        addViewClick(Rect(bounds), event.eventTime)
     }
 
+    /** Position of a tap, reported by the outside touch watcher. It has no duration and no size. */
     private fun onTapRecorded(x: Float, y: Float, eventTimeMs: Long) {
-        addTap(x, y, eventTimeMs, fromView = false)
+        if (!isTapCapture) return
+
+        watcherTaps.add(RecordedTouch(x = x, y = y, timeMs = eventTimeMs))
     }
 
-    /**
-     * Store a tap, keeping a single action per gesture.
-     *
-     * A gesture is reported twice: by the outside touch watcher and by the accessibility click event of the view that
-     * received it. The view bounds are preferred, and a touch reported at (0,0) (no coordinates available) is dropped.
-     */
-    private fun addTap(x: Float, y: Float, eventTimeMs: Long, fromView: Boolean) {
-        if (x == 0f && y == 0f) return
+    /** Store the click of a view. The duplicated events of a single gesture are filtered when the taps are merged. */
+    private fun addViewClick(bounds: Rect, eventTimeMs: Long) {
+        if (bounds.isEmpty) return
 
-        val existingIndex = tapActions.indexOfLast { tap -> abs(tap.startTimeMs - eventTimeMs) <= TAP_DEDUP_DURATION_MS }
-        if (existingIndex >= 0) {
-            if (fromView) tapActions[existingIndex] = tapAt(x, y, eventTimeMs)
-            return
-        }
-
-        tapActions.add(tapAt(x, y, eventTimeMs))
-    }
-
-    private fun tapAt(x: Float, y: Float, eventTimeMs: Long): RecordedAction.Tap =
-        RecordedAction.Tap(
-            startTimeMs = eventTimeMs,
-            endTimeMs = eventTimeMs + TAP_PRESS_DURATION_MS,
-            x = x,
-            y = y,
+        viewClicks.add(
+            RecordedViewClick(
+                left = bounds.left,
+                top = bounds.top,
+                right = bounds.right,
+                bottom = bounds.bottom,
+                timeMs = eventTimeMs,
+            )
         )
+    }
 
-    private companion object {
-        /** The outside touches do not carry their duration: use the same default as the quick click scenario. */
-        const val TAP_PRESS_DURATION_MS = 50L
+    /** One action per gesture, built from the two sources of the capture. */
+    private fun mergedTaps(): List<RecordedAction.Tap> = TapMerger.merge(watcherTaps, viewClicks)
 
-        /** A touch and the click event of the same gesture never arrive more than this apart. */
-        const val TAP_DEDUP_DURATION_MS = 300L
+    private fun clearTaps() {
+        watcherTaps.clear()
+        viewClicks.clear()
     }
 }

@@ -29,6 +29,8 @@ import com.buzbuz.smartautoclicker.core.dumb.domain.model.DumbGestureFingerMotio
 import com.buzbuz.smartautoclicker.core.dumb.domain.model.DumbScenario
 import com.buzbuz.smartautoclicker.core.dumb.domain.model.REPEAT_DELAY_MAX_MS
 
+import nl.tartaruzz.autoclicky.engine.RepeatSetting
+
 import kotlin.math.roundToInt
 import kotlin.math.sqrt
 
@@ -40,23 +42,36 @@ import kotlin.math.sqrt
  */
 object DumbScenarioBuilder {
 
-    fun build(name: String, actions: List<RecordedAction>): DumbScenario {
+    /**
+     * Build the template of a recording.
+     *
+     * @param repeat how many times the template must be played. [RepeatSetting.loopDelayMs] is added after the last
+     * action, which is what the engine waits before starting a new pass.
+     */
+    fun build(
+        name: String,
+        actions: List<RecordedAction>,
+        repeat: RepeatSetting = RepeatSetting.SINGLE,
+    ): DumbScenario {
         val scenarioId = Identifier(TEMP_SCENARIO_ID, asTemporary = true)
+        val setting = repeat.sanitized()
 
         return DumbScenario(
             id = scenarioId,
             name = name,
             dumbActions = actions.mapIndexed { index, action ->
+                val delayUntilNextAction = actions.getOrNull(index + 1)
+                    ?.let { nextAction -> (nextAction.startTimeMs - action.endTimeMs).coerceAtLeast(0L) }
+                    ?: setting.loopDelayMs
+
                 action.toDumbAction(
                     scenarioId = scenarioId,
                     priority = index,
-                    repeatDelayMs = actions.getOrNull(index + 1)
-                        ?.let { nextAction -> (nextAction.startTimeMs - action.endTimeMs).coerceAtLeast(0L) }
-                        ?: 0L,
+                    repeatDelayMs = delayUntilNextAction,
                 )
             },
-            repeatCount = 1,
-            isRepeatInfinite = false,
+            repeatCount = setting.repeatCount,
+            isRepeatInfinite = setting.isRepeatInfinite,
             maxDurationMin = DUMB_SCENARIO_MAX_DURATION_MINUTES,
             isDurationInfinite = true,
             randomize = false,

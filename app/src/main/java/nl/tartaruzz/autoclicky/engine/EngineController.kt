@@ -22,14 +22,19 @@ package nl.tartaruzz.autoclicky.engine
 import android.util.Log
 
 import com.buzbuz.smartautoclicker.core.dumb.domain.IDumbRepository
+import com.buzbuz.smartautoclicker.core.dumb.domain.model.DumbAction
 import com.buzbuz.smartautoclicker.core.dumb.domain.model.DumbScenario
+import com.buzbuz.smartautoclicker.core.dumb.domain.model.REPEAT_DELAY_MAX_MS
 import com.buzbuz.smartautoclicker.core.dumb.engine.DumbEngine
 
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -70,6 +75,30 @@ class EngineController @Inject constructor(
 
     /** True when the accessibility service is connected, which is required to execute any gesture. */
     val isAccessibilityServiceConnected: StateFlow<Boolean> = _isAccessibilityServiceConnected
+
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+
+    private val _repeatSetting = MutableStateFlow(RepeatSetting.SINGLE)
+
+    /**
+     * How the templates are played: once, a fixed number of times or endlessly.
+     *
+     * Chosen from the panel or from the save card, it applies to the next [startScenario] done without an explicit
+     * setting, which is what the PLAY button does.
+     */
+    val repeatSetting: StateFlow<RepeatSetting> = _repeatSetting
+
+    private val _isInfiniteRunActive = MutableStateFlow(false)
+
+    /** True while the running template repeats endlessly, so a touch on the screen must stop it. */
+    val isInfiniteRunActive: StateFlow<Boolean> = _isInfiniteRunActive
+
+    init {
+        // The engine can also stop on its own (last repetition reached): forget the endless run in that case too.
+        scope.launch {
+            isRunning.collect { running -> if (!running) _isInfiniteRunActive.value = false }
+        }
+    }
 
     fun onAccessibilityServiceConnected() {
         Log.i(TAG, "Accessibility service connected")
@@ -113,34 +142,58 @@ class EngineController @Inject constructor(
 
     /**
      * Start the scenario with the provided database id. Returns false if it can't be started.
+     *
+     * @param repeat how the scenario must be repeated. When null, the setting stored in the template is used, so a
+     * template saved as "5×" keeps playing five times. The setting is only applied in memory, the stored template is
+     * left untouched: use [persistScenarioRepeat] to store it.
      */
-    suspend fun startScenario(scenarioDbId: Long): Boolean {
+    suspend fun startScenario(scenarioDbId: Long, repeat: RepeatSetting? = null): Boolean {
         if (!_isAccessibilityServiceConnected.value) return false
 
-        val scenario = onDatabase { dumbRepository.getDumbScenario(scenarioDbId) } ?: return false
+        val storedScenario = onDatabase { dumbRepository.getDumbScenario(scenarioDbId) } ?: return false
+        val scenario = repeat?.let { setting -> storedScenario.withRepeat(setting) } ?: storedScenario
         if (!scenario.isValid()) return false
+
+        _repeatSetting.value = scenario.toRepeatSetting()
 
         dumbEngine.init(scenario)
         dumbEngine.startDumbScenario()
         _lastStartedScenarioId.value = scenarioDbId
+        _isInfiniteRunActive.value = scenario.isRepeatInfinite
         return true
     }
 
     /**
      * Start the scenario that was played last, falling back to the first stored one.
      *
+     * @param repeat how the scenario must be repeated, see [startScenario].
      * @return false if no scenario could be started.
      */
-    suspend fun startLastUsedScenario(): Boolean {
+    suspend fun startLastUsedScenario(repeat: RepeatSetting? = null): Boolean {
         val lastStartedId = _lastStartedScenarioId.value
-        if (lastStartedId != null && startScenario(lastStartedId)) return true
+        if (lastStartedId != null && startScenario(lastStartedId, repeat)) return true
 
         val fallbackId = onDatabase { dumbRepository.dumbScenarios.first().firstOrNull()?.id?.databaseId }
             ?: return false
-        return startScenario(fallbackId)
+        return startScenario(fallbackId, repeat)
+    }
+
+    /** Remember how the templates must be played, without starting anything. */
+    fun setRepeatSetting(repeat: RepeatSetting) {
+        _repeatSetting.value = repeat.sanitized()
+    }
+
+    /** Store the repeat choice in the template itself, so it survives a restart. */
+    suspend fun persistScenarioRepeat(scenarioDbId: Long, repeat: RepeatSetting) {
+        val scenario = onDatabase { dumbRepository.getDumbScenario(scenarioDbId) } ?: return
+
+        onDatabase {
+            dumbRepository.updateDumbScenario(scenario.withRepeat(repeat.sanitized()))
+        }
     }
 
     fun stopScenario() {
+        _isInfiniteRunActive.value = false
         dumbEngine.stopDumbScenario()
     }
 
@@ -162,6 +215,36 @@ class EngineController @Inject constructor(
 
         onDatabase { dumbRepository.deleteDumbScenario(scenario) }
     }
+}
+
+/**
+ * Apply a [RepeatSetting] to this scenario.
+ *
+ * The loop delay is stored on the last action: the engine waits the `repeatDelayMs` of an action after executing it, so
+ * the delay of the last one is also the idle time between two passes. It is only touched when the scenario actually
+ * repeats, so a single run keeps the delays that were recorded.
+ */
+private fun DumbScenario.withRepeat(repeat: RepeatSetting): DumbScenario {
+    val setting = repeat.sanitized()
+    val actions = if (setting.isSingleRun) {
+        dumbActions
+    } else {
+        dumbActions.mapIndexed { index, action ->
+            if (index == dumbActions.lastIndex) action.withRepeatDelay(setting.loopDelayMs) else action
+        }
+    }
+
+    return copy(
+        repeatCount = setting.repeatCount,
+        isRepeatInfinite = setting.isRepeatInfinite,
+        dumbActions = actions,
+    )
+}
+
+private fun DumbAction.withRepeatDelay(delayMs: Long): DumbAction = when (this) {
+    is DumbAction.DumbClick -> copy(repeatDelayMs = delayMs.coerceAtMost(REPEAT_DELAY_MAX_MS))
+    is DumbAction.DumbGesture -> copy(repeatDelayMs = delayMs.coerceAtMost(REPEAT_DELAY_MAX_MS))
+    is DumbAction.DumbPause -> this
 }
 
 private const val TAG = "EngineController"

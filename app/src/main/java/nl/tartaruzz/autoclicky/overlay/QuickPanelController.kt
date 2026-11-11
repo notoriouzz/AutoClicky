@@ -20,6 +20,7 @@
 package nl.tartaruzz.autoclicky.overlay
 
 import android.accessibilityservice.AccessibilityService
+import android.util.Log
 import android.widget.Toast
 
 import kotlinx.coroutines.CoroutineScope
@@ -34,6 +35,8 @@ import kotlinx.coroutines.launch
 import com.buzbuz.smartautoclicker.core.dumb.domain.model.DumbScenario
 
 import nl.tartaruzz.autoclicky.engine.EngineController
+import nl.tartaruzz.autoclicky.engine.RepeatSetting
+import nl.tartaruzz.autoclicky.engine.toRepeatSetting
 import nl.tartaruzz.autoclicky.recording.CompletedRecording
 import nl.tartaruzz.autoclicky.recording.DumbScenarioBuilder
 import nl.tartaruzz.autoclicky.recording.RecordingController
@@ -73,6 +76,7 @@ class QuickPanelController @Inject constructor(
     private var overlay: QuickPanelOverlay? = null
     private var saveOverlay: SaveRecordingOverlay? = null
     private var pickerOverlay: ScenarioPickerOverlay? = null
+    private var repeatOverlay: RepeatOverlay? = null
 
     private var stateJob: Job? = null
     private var completedRecordingJob: Job? = null
@@ -84,6 +88,10 @@ class QuickPanelController @Inject constructor(
 
     /** The recording currently offered in [SaveRecordingOverlay], so it is not displayed twice. */
     private var offeredRecording: CompletedRecording? = null
+
+    /** True while one of the full screen cards is displayed; the panel is hidden during that time. */
+    private val isCardOpen: Boolean
+        get() = saveOverlay != null || pickerOverlay != null || repeatOverlay != null
 
     private val _isPanelRequested = MutableStateFlow(false)
 
@@ -99,11 +107,13 @@ class QuickPanelController @Inject constructor(
                 engineController.isRunning,
                 recordingController.isRecording,
                 engineController.scenarios,
-            ) { isRunning, isRecording, scenarios ->
+                engineController.repeatSetting,
+            ) { isRunning, isRecording, scenarios, repeat ->
                 PanelState(
                     isRunning = isRunning,
                     isRecording = isRecording,
                     scenarios = scenarios,
+                    repeatLabel = repeat.label,
                 )
             }.collect { state -> onPanelState(state) }
         }
@@ -133,6 +143,8 @@ class QuickPanelController @Inject constructor(
         saveOverlay = null
         pickerOverlay?.dismiss()
         pickerOverlay = null
+        repeatOverlay?.dismiss()
+        repeatOverlay = null
         offeredRecording = null
 
         overlay?.hide()
@@ -171,13 +183,17 @@ class QuickPanelController @Inject constructor(
 
     private fun applyState() {
         val state = lastState
-        val shouldBeVisible = !state.isRecording &&
+        // A card is a full screen window of its own: the panel would sit above it and swallow the taps meant for it.
+        val shouldBeVisible = !state.isRecording && !isCardOpen &&
             (isVisibleRequested || (state.isRunning && !isDismissedForCurrentRun))
 
         if (state.isRecording) {
             // The picker would sit on top of the capture overlay and cannot play anything during a capture.
             pickerOverlay?.dismiss()
             pickerOverlay = null
+
+            repeatOverlay?.dismiss()
+            repeatOverlay = null
         }
 
         if (shouldBeVisible) {
@@ -195,8 +211,10 @@ class QuickPanelController @Inject constructor(
             canRecord = !state.isRunning && !state.isRecording,
             canStop = state.isRunning || state.isRecording,
             canPlay = state.hasScenarios && !state.isRunning && !state.isRecording,
+            canRepeat = state.hasScenarios && !state.isRecording,
             canList = !state.isRecording,
         )
+        overlay?.setRepeatLabel(state.repeatLabel)
     }
 
     private fun showOverlay(): Boolean {
@@ -212,6 +230,7 @@ class QuickPanelController @Inject constructor(
             onRecordClicked = ::onRecordClicked,
             onStopClicked = ::onStopClicked,
             onPlayClicked = ::onPlayClicked,
+            onRepeatClicked = ::onRepeatClicked,
             onListClicked = ::onListClicked,
             onHideClicked = ::onHideClicked,
         )
@@ -248,6 +267,63 @@ class QuickPanelController @Inject constructor(
         }
     }
 
+    /** Offer the repeat choices for the last template, and play it with the chosen one. */
+    private fun onRepeatClicked() {
+        val service = service ?: return
+
+        dismissRepeatOverlay()
+
+        val lastScenarioId = engineController.lastStartedScenarioId.value
+        val template = lastState.scenarios.firstOrNull { scenario -> scenario.id.databaseId == lastScenarioId }
+            ?: lastState.scenarios.firstOrNull()
+            ?: return showMessage("No template to play yet, record one first")
+
+        val overlay = RepeatOverlay(
+            service = service,
+            templateName = template.name,
+            initialRepeat = template.toRepeatSetting(),
+            onPlay = ::startWithRepeat,
+            onCancel = ::dismissRepeatOverlay,
+        )
+        repeatOverlay = overlay
+
+        if (!overlay.show()) {
+            repeatOverlay = null
+            showMessage("Cannot display the repeat dialog, is the accessibility service enabled?")
+        }
+
+        applyState()
+    }
+
+    private fun dismissRepeatOverlay() {
+        repeatOverlay?.dismiss()
+        repeatOverlay = null
+        applyState()
+    }
+
+    private fun startWithRepeat(repeat: RepeatSetting) {
+        dismissRepeatOverlay()
+
+        scope.launch {
+            val scenarioId = engineController.lastStartedScenarioId.value
+                ?: lastState.scenarios.firstOrNull()?.id?.databaseId
+                ?: return@launch showMessage("No template to play yet, record one first")
+
+            try {
+                // Stored in the template first: the next PLAY, from anywhere, uses the same repeat.
+                engineController.persistScenarioRepeat(scenarioId, repeat)
+                engineController.setRepeatSetting(repeat)
+
+                if (!engineController.startScenario(scenarioId)) {
+                    showMessage("Cannot play this template, is the accessibility service enabled?")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Cannot save the repeat setting of the template", e)
+                showMessage("Cannot play this template, the template could not be updated")
+            }
+        }
+    }
+
     private fun onListClicked() {
         val service = service ?: return
 
@@ -258,7 +334,10 @@ class QuickPanelController @Inject constructor(
             scenarios = lastState.scenarios,
             isScenarioEnabled = !lastState.isRunning && !lastState.isRecording,
             onScenarioSelected = ::onScenarioSelected,
-            onDismissed = { pickerOverlay = null },
+            onDismissed = {
+                pickerOverlay = null
+                applyState()
+            },
         )
         pickerOverlay = picker
 
@@ -266,11 +345,14 @@ class QuickPanelController @Inject constructor(
             pickerOverlay = null
             showMessage("Cannot display the template list, is the accessibility service enabled?")
         }
+
+        applyState()
     }
 
     private fun onScenarioSelected(scenario: DumbScenario) {
         pickerOverlay?.dismiss()
         pickerOverlay = null
+        applyState()
 
         scope.launch {
             if (!engineController.startScenario(scenario.id.databaseId)) {
@@ -290,10 +372,12 @@ class QuickPanelController @Inject constructor(
             service = service,
             actionCount = recording.actions.size,
             recordingName = defaultRecordingName(),
-            onSave = { saveRecording(recording) },
+            initialRepeat = engineController.repeatSetting.value,
+            onSave = { repeat -> saveRecording(recording, repeat) },
             onCancel = {
                 saveOverlay?.dismiss()
                 saveOverlay = null
+                applyState()
             },
         )
         saveOverlay = overlay
@@ -302,25 +386,38 @@ class QuickPanelController @Inject constructor(
             saveOverlay = null
             showMessage("Cannot display the save dialog, open AutoClicky to save the recording")
         }
+
+        applyState()
     }
 
-    private fun saveRecording(recording: CompletedRecording) {
+    private fun saveRecording(recording: CompletedRecording, repeat: RepeatSetting) {
         saveOverlay?.dismiss()
         saveOverlay = null
+        applyState()
 
         val templateName = defaultRecordingName()
 
         scope.launch {
-            val scenarioId = engineController.addScenario(DumbScenarioBuilder.build(templateName, recording.actions))
+            engineController.setRepeatSetting(repeat)
+
+            val scenarioId = try {
+                engineController.addScenario(DumbScenarioBuilder.build(templateName, recording.actions, repeat))
+            } catch (e: Exception) {
+                Log.e(TAG, "Cannot save the recording", e)
+                null
+            }
             recordingController.consumeCompletedRecording()
 
             if (scenarioId == null) {
                 showMessage("Could not save the recording")
             } else {
-                showMessage("Saved: $templateName")
+                showMessage("Saved: $templateName${repeat.suffix()}")
             }
         }
     }
+
+    /** " · 5×" for a repeated template, nothing for a single pass. */
+    private fun RepeatSetting.suffix(): String = if (isSingleRun) "" else " · $label"
 
     private fun onHideClicked() {
         isVisibleRequested = false
@@ -343,7 +440,12 @@ class QuickPanelController @Inject constructor(
         val isRunning: Boolean = false,
         val isRecording: Boolean = false,
         val scenarios: List<DumbScenario> = emptyList(),
+        val repeatLabel: String = RepeatSetting.SINGLE.label,
     ) {
         val hasScenarios: Boolean get() = scenarios.isNotEmpty()
+    }
+
+    private companion object {
+        const val TAG = "QuickPanelController"
     }
 }

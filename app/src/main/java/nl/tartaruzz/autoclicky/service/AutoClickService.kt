@@ -30,6 +30,7 @@ import dagger.hilt.android.AndroidEntryPoint
 
 import nl.tartaruzz.autoclicky.engine.EngineController
 import nl.tartaruzz.autoclicky.overlay.QuickPanelController
+import nl.tartaruzz.autoclicky.overlay.TouchStopController
 import nl.tartaruzz.autoclicky.recording.RecordingController
 
 import javax.inject.Inject
@@ -49,6 +50,7 @@ class AutoClickService : AccessibilityService() {
     @Inject lateinit var engineController: EngineController
     @Inject lateinit var recordingController: RecordingController
     @Inject lateinit var quickPanelController: QuickPanelController
+    @Inject lateinit var touchStopController: TouchStopController
 
     override fun onServiceConnected() {
         super.onServiceConnected()
@@ -57,6 +59,7 @@ class AutoClickService : AccessibilityService() {
         androidActionExecutor.init(this)
         recordingController.attach(this)
         quickPanelController.attach(this)
+        touchStopController.attach(this)
         engineController.onAccessibilityServiceConnected()
 
         Log.i(TAG, "Accessibility service ready")
@@ -65,9 +68,12 @@ class AutoClickService : AccessibilityService() {
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         val safeEvent = event ?: return
 
-        if (safeEvent.eventType == AccessibilityEvent.TYPE_VIEW_CLICKED) {
-            recordingController.onViewClicked(safeEvent)
-        }
+        if (safeEvent.eventType != AccessibilityEvent.TYPE_VIEW_CLICKED) return
+
+        // The panel and the overlays are part of AutoClicky: their own clicks must never be recorded.
+        if (safeEvent.packageName == packageName) return
+
+        recordingController.onViewClicked(safeEvent)
     }
 
     override fun onInterrupt() = Unit
@@ -75,6 +81,7 @@ class AutoClickService : AccessibilityService() {
     override fun onUnbind(intent: Intent?): Boolean {
         Log.i(TAG, "Accessibility service unbound")
 
+        touchStopController.detach()
         quickPanelController.detach()
         recordingController.detach()
         engineController.onAccessibilityServiceDisconnected()
