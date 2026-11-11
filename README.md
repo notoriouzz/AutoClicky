@@ -21,6 +21,24 @@ template library are specific to AutoClicky.
 - **About & license** — the app shows its GPL-3.0 text and the upstream credits (the license file is bundled in the APK).
 - **No root, no media projection, no overlay permission** — everything runs through a single accessibility service.
 
+## Relationship with Smart AutoClicker (is this a fork?)
+
+Short answer: **it is not a GitHub fork**. AutoClicky is a *derivative work*: the source code of
+[Smart AutoClicker (Klick'r)](https://github.com/Nain57/Smart-AutoClicker) is vendored (copied) into `core/`, and this
+repository has its own, independent Git history — so GitHub shows no "forked from …" banner.
+
+GitHub's *Fork* button is only a platform feature (it duplicates the repository and links it to its parent); it is not
+something the GPL requires. The GPL-3.0 obligations are met by:
+
+- the upstream copyright header in every vendored file,
+- `THIRD_PARTY_NOTICES.md` with the upstream project, revision (`699bff8`), module mapping and the exact changes made,
+- the credit in this README and in the in-app **About & license** dialog,
+- publishing the whole work under the GPL-3.0-or-later.
+
+If you ever want the GitHub "fork" association (for example to open pull requests upstream), create a real fork of
+`Nain57/Smart-AutoClicker` and put AutoClicky on a branch there. For this repository, the attribution above is correct
+and sufficient.
+
 ## Requirements
 
 | Tool | Version |
@@ -51,7 +69,37 @@ The SDK location comes from `local.properties` (`sdk.dir=...`).
 Outputs:
 
 - `app/build/outputs/apk/debug/app-debug.apk`
-- `app/build/outputs/apk/release/app-release-unsigned.apk`
+- `app/build/outputs/apk/release/app-release.apk` — signed and installable (see below)
+- `app/build/outputs/apk/release/app-release-unsigned.apk` — only when no signing credentials are available
+
+### Release signing
+
+The release APK is signed with a keystore that is **not** part of this repository. Credentials are read from the
+git-ignored `keystore.properties` in the repository root:
+
+```properties
+storeFile=C:/path/to/autoclicky-release.jks
+storePassword=…
+keyAlias=autoclicky
+keyPassword=…
+```
+
+or from the `AUTOCLICKY_KEYSTORE`, `AUTOCLICKY_KEYSTORE_PASSWORD`, `AUTOCLICKY_KEY_ALIAS` and
+`AUTOCLICKY_KEY_PASSWORD` environment variables (handy for CI). Without them the release build stays unsigned and cannot
+be installed on a device. Keystores, `keystore.properties` and `*.jks` are listed in `.gitignore`: never commit them,
+and keep a safe backup — Android refuses to update an app whose APK is signed with a different key.
+
+## Install the app (APK)
+
+Each published version is available as a signed APK on the **Releases** page of this repository:
+
+1. Download `AutoClicky-<version>.apk` from the latest release.
+2. Allow "install unknown apps" for the browser or file manager when Android asks.
+3. Open the downloaded file and install it.
+
+Requirements: **Android 16 (API 36) or newer**, because the app is built with `minSdk 36`. After installing, open
+AutoClicky and enable its accessibility service (**Open accessibility settings → AutoClicky**), otherwise nothing can
+be recorded or replayed.
 
 ## Usage
 
@@ -168,3 +216,6 @@ If you hand an APK to anyone (Play Store, GitHub release, a friend's phone) the 
    under the GPL-3.0-or-later;
 2. keep the copyright notices, `LICENSE`, `THIRD_PARTY_NOTICES.md` and the in-app license (About & license) intact;
 3. not add restrictions on top of the GPL — the app cannot be relicensed as proprietary, MIT or Apache.
+
+The repository itself may be private: the GPL does not require public hosting, only that the people who receive the
+APK can obtain the corresponding source (for example by being given access to this repository or a source archive).

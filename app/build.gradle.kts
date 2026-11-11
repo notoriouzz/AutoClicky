@@ -17,12 +17,46 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.google.ksp)
     alias(libs.plugins.google.dagger.hilt)
 }
+
+/*
+ * Release signing.
+ *
+ * The keystore and its credentials are never part of the repository. They are read from the git-ignored
+ * `keystore.properties` at the repository root, or from the AUTOCLICKY_KEYSTORE* environment variables:
+ *
+ *   storeFile=...        AUTOCLICKY_KEYSTORE
+ *   storePassword=...    AUTOCLICKY_KEYSTORE_PASSWORD
+ *   keyAlias=...         AUTOCLICKY_KEY_ALIAS
+ *   keyPassword=...      AUTOCLICKY_KEY_PASSWORD
+ *
+ * Without them the release build is produced unsigned (app-release-unsigned.apk), which cannot be installed on a device.
+ */
+val signingProperties = Properties().apply {
+    val propertiesFile = rootProject.file("keystore.properties")
+    if (propertiesFile.exists()) {
+        propertiesFile.inputStream().use { load(it) }
+    }
+}
+
+fun signingValue(propertyName: String, environmentName: String): String? =
+    (signingProperties.getProperty(propertyName) ?: System.getenv(environmentName))?.takeIf { it.isNotBlank() }
+
+val releaseKeystoreFile = signingValue("storeFile", "AUTOCLICKY_KEYSTORE")?.let { file(it) }
+val releaseKeystorePassword = signingValue("storePassword", "AUTOCLICKY_KEYSTORE_PASSWORD")
+val releaseKeyAlias = signingValue("keyAlias", "AUTOCLICKY_KEY_ALIAS")
+val releaseKeyPassword = signingValue("keyPassword", "AUTOCLICKY_KEY_PASSWORD")
+val hasReleaseSigning = releaseKeystoreFile != null &&
+    releaseKeystorePassword != null &&
+    releaseKeyAlias != null &&
+    releaseKeyPassword != null
 
 android {
     namespace = "nl.tartaruzz.autoclicky"
@@ -40,11 +74,28 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    signingConfigs {
+        if (hasReleaseSigning) {
+            create("release") {
+                storeFile = releaseKeystoreFile
+                storePassword = releaseKeystorePassword
+                keyAlias = releaseKeyAlias
+                keyPassword = releaseKeyPassword
+                enableV1Signing = true
+                enableV2Signing = true
+            }
+        }
+    }
+
     buildTypes {
         release {
+            if (hasReleaseSigning) {
+                signingConfig = signingConfigs.getByName("release")
+            }
             optimization {
+                // Keep the standard R8 configuration: letting R8 repackage the Kotlin/AndroidX libraries
+                // (packageScope) made the app crash at startup with an IllegalAccessError on kotlin.text internals.
                 enable = true
-                packageScope = setOf("androidx.**", "kotlin.**", "kotlinx.**")
             }
         }
     }
