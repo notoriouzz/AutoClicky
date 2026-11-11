@@ -79,6 +79,9 @@ fun AboutDialog(onDismiss: () -> Unit) {
                     text = "https://github.com/notoriouzz/AutoClicky",
                     style = MaterialTheme.typography.bodyMedium,
                 )
+                TextButton(onClick = { context.openUrl(SUPPORT_URL) }) {
+                    Text(SUPPORT_LABEL)
+                }
                 Text(
                     text = "Copyright (C) 2026 AutoClicky contributors.\n" +
                         "Licensed under the GNU General Public License v3.0 or later.",

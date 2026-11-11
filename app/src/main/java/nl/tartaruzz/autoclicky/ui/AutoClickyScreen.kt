@@ -41,6 +41,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 
@@ -66,6 +67,7 @@ fun AutoClickyScreen(
     modifier: Modifier = Modifier,
 ) {
     val coroutineScope = rememberCoroutineScope()
+    val context = LocalContext.current
 
     val scenarios by engineController.scenarios.collectAsState(initial = emptyList())
     val isRunning by engineController.isRunning.collectAsState()
@@ -186,6 +188,26 @@ fun AutoClickyScreen(
                 },
             )
         }
+
+        Text(
+            text = "Support",
+            style = MaterialTheme.typography.titleLarge,
+        )
+
+        Text(
+            text = "AutoClicky is free, without ads and without tracking. If it saves you some time, you can buy me a " +
+                "coffee: it pays for the test phones and for the coffee that keeps the code flowing.",
+            style = MaterialTheme.typography.bodyMedium,
+        )
+
+        Button(onClick = { context.openUrl(SUPPORT_URL) }) {
+            Text(SUPPORT_LABEL)
+        }
+
+        Text(
+            text = SUPPORT_URL,
+            style = MaterialTheme.typography.bodySmall,
+        )
 
         message?.let { text ->
             Text(

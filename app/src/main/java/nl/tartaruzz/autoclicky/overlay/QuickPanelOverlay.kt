@@ -25,6 +25,7 @@ import android.graphics.Color
 import android.graphics.PixelFormat
 import android.graphics.drawable.GradientDrawable
 import android.view.Gravity
+import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewConfiguration
@@ -50,6 +51,7 @@ import kotlin.math.roundToInt
 class QuickPanelOverlay(
     private val service: AccessibilityService,
     private val onRecordClicked: () -> Unit,
+    private val onRecordGestureClicked: () -> Unit,
     private val onStopClicked: () -> Unit,
     private val onPlayClicked: () -> Unit,
     private val onRepeatClicked: () -> Unit,
@@ -151,7 +153,14 @@ class QuickPanelOverlay(
             contentDescription = "AutoClicky floating panel"
         }
 
-        recordButton = actionButton("REC", RECORD_COLOR, "Record the taps made in any app", params, onRecordClicked)
+        recordButton = actionButton(
+            label = "REC",
+            backgroundColor = RECORD_COLOR,
+            description = "Record taps, hold to record gestures",
+            params = params,
+            onClick = onRecordClicked,
+            onLongPress = onRecordGestureClicked,
+        )
         stopButton = actionButton("STOP", STOP_COLOR, "Stop recording or playing", params, onStopClicked)
         playButton = actionButton("PLAY", PLAY_COLOR, "Play the last template", params, onPlayClicked)
         repeatButton = actionButton(
@@ -176,6 +185,7 @@ class QuickPanelOverlay(
         description: String,
         params: WindowManager.LayoutParams,
         onClick: () -> Unit,
+        onLongPress: (() -> Unit)? = null,
     ): TextView = TextView(service).apply {
         text = label
         setTextColor(Color.WHITE)
@@ -189,7 +199,7 @@ class QuickPanelOverlay(
         layoutParams = LinearLayout.LayoutParams(toPx(BUTTON_SIZE_DP), toPx(BUTTON_SIZE_DP)).apply {
             marginStart = toPx(BUTTON_SPACING_DP)
         }
-        setOnTouchListener(DragTouchListener(params, onClick))
+        setOnTouchListener(DragTouchListener(params, onClick, onLongPress))
     }
 
     private fun TextView.setButtonEnabled(enabled: Boolean) {
@@ -248,6 +258,7 @@ class QuickPanelOverlay(
     private inner class DragTouchListener(
         private val params: WindowManager.LayoutParams,
         private val onClick: () -> Unit,
+        private val onLongPress: (() -> Unit)? = null,
     ) : View.OnTouchListener {
 
         private val touchSlop = ViewConfiguration.get(service).scaledTouchSlop
@@ -257,6 +268,9 @@ class QuickPanelOverlay(
         private var startX = 0
         private var startY = 0
         private var isDragging = false
+
+        private var longPressRunnable: Runnable? = null
+        private var isLongPressHandled = false
 
         override fun onTouch(view: View, event: MotionEvent): Boolean {
             if (!view.isEnabled) return false
@@ -268,6 +282,8 @@ class QuickPanelOverlay(
                     startX = params.x
                     startY = params.y
                     isDragging = false
+                    isLongPressHandled = false
+                    scheduleLongPress(view)
                     return true
                 }
 
@@ -277,6 +293,7 @@ class QuickPanelOverlay(
 
                     if (!isDragging && (abs(deltaX) > touchSlop || abs(deltaY) > touchSlop)) {
                         isDragging = true
+                        cancelLongPress(view)
                     }
                     if (isDragging) {
                         moveTo(startX + deltaX.toInt(), startY + deltaY.toInt())
@@ -285,17 +302,43 @@ class QuickPanelOverlay(
                 }
 
                 MotionEvent.ACTION_UP -> {
-                    if (!isDragging) {
+                    cancelLongPress(view)
+                    if (!isDragging && !isLongPressHandled) {
                         view.performClick()
                         onClick()
                     }
                     return true
                 }
 
-                MotionEvent.ACTION_CANCEL -> return true
+                MotionEvent.ACTION_CANCEL -> {
+                    cancelLongPress(view)
+                    return true
+                }
             }
 
             return false
+        }
+
+        /** Holds the finger on the button to trigger its alternative action, without turning it into a click. */
+        private fun scheduleLongPress(view: View) {
+            val callback = onLongPress ?: return
+
+            val runnable = Runnable {
+                if (isDragging) return@Runnable
+
+                isLongPressHandled = true
+                view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+                callback()
+            }
+
+            longPressRunnable = runnable
+            view.postDelayed(runnable, LONG_PRESS_DURATION_MS)
+        }
+
+        private fun cancelLongPress(view: View) {
+            val runnable = longPressRunnable ?: return
+            longPressRunnable = null
+            view.removeCallbacks(runnable)
         }
 
         private fun moveTo(x: Int, y: Int) {
@@ -322,6 +365,9 @@ class QuickPanelOverlay(
         val REPEAT_COLOR: Int = Color.parseColor("#6A1B9A")
         val LIST_COLOR: Int = Color.parseColor("#3949AB")
         val HIDE_COLOR: Int = Color.parseColor("#424242")
+
+        /** How long the REC button must be held to record gestures instead of taps. */
+        const val LONG_PRESS_DURATION_MS = 550L
 
         const val PANEL_PADDING_DP = 6
         const val PANEL_CORNER_RADIUS_DP = 22

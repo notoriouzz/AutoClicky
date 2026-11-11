@@ -133,11 +133,13 @@ class RecordingController @Inject constructor() {
             ScenarioRecorder.toRecordedActions(strokeCollector?.getStrokes().orEmpty())
         }
 
+        val mode = if (isTapCapture) RecordingMode.TAPS else RecordingMode.GESTURES
+
         clearTaps()
         strokeCollector = null
 
         if (actions.isNotEmpty()) {
-            _completedRecording.value = CompletedRecording(actions)
+            _completedRecording.value = CompletedRecording(actions = actions, mode = mode)
         }
     }
 

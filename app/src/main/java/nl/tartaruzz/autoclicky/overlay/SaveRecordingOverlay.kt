@@ -47,7 +47,7 @@ import kotlin.math.roundToInt
  */
 class SaveRecordingOverlay(
     private val service: AccessibilityService,
-    private val actionCount: Int,
+    private val summary: String,
     private val recordingName: String,
     private val initialRepeat: RepeatSetting,
     private val onSave: (RepeatSetting) -> Unit,
@@ -139,7 +139,7 @@ class SaveRecordingOverlay(
 
         card.addView(
             TextView(service).apply {
-                text = "$actionCount action(s)"
+                text = summary
                 setTextColor(MUTED_TEXT_COLOR)
                 textSize = SUBTITLE_TEXT_SIZE_SP
             }

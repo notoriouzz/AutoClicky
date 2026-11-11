@@ -27,6 +27,13 @@ template library are specific to AutoClicky.
 
 Made by **Notoriouzz** — <https://github.com/notoriouzz/AutoClicky>.
 
+## Support
+
+AutoClicky is free, without ads and without tracking. If it saves you some time, you can buy me a coffee: it pays for
+the test phones and for the coffee that keeps the code flowing.
+
+☕ <https://ko-fi.com/tartaruzz>
+
 ## Relationship with Smart AutoClicker (is this a fork?)
 
 Short answer: **it is not a GitHub fork**. AutoClicky is a *derivative work*: the source code of
@@ -124,15 +131,18 @@ be recorded or replayed.
 Tap **Show floating panel** in the main screen (the panel also appears on its own while a template runs). A small
 draggable bar with **REC / STOP / PLAY / ×N / LIST / X** then stays above every other app:
 
-1. **REC** — starts a tap recording: open any app, tap what you want to replay, then press **STOP** on the panel (or the
-   floating **Stop recording** button).
-2. The **Save recording** card opens immediately, above the app you are in: tap **SAVE** to store it (the proposed name
-   is shown, it can be renamed in the app), or **DISCARD**. No keyboard is needed, so the card never gets stuck behind
-   it. The template is stored right away and **PLAY replays it**, without opening AutoClicky.
-3. **PLAY** — replays the template that was played last (the first one when none was played yet) above the app you are
+1. **REC** — starts a **tap** recording: open any app, tap what you want to replay, then press **STOP** on the panel (or
+   the floating **Stop recording** button). A red banner at the top of the screen says *Recording TAPS* while it runs.
+2. **Hold REC** (~0,5 s) — starts a **gesture** recording instead: the screen dims and you draw the gestures (swipes,
+   long press, multi finger) the template must replay, then press **STOP**. The banner says *Recording GESTURES*, and the
+   app underneath cannot be used while this mode is active (the overlay swallows the touches).
+3. The **Save recording** card opens immediately, above the app you are in: it shows what was captured (*12 taps* or
+   *3 gestures*), the repeat choices and a large **SAVE** / **DISCARD**. No keyboard is needed, so the card never gets
+   stuck behind it. The template is stored right away and **PLAY replays it**, without opening AutoClicky.
+4. **PLAY** — replays the template that was played last (the first one when none was played yet) above the app you are
    in.
-4. **LIST** — opens the template list above the current app: tap a row (or its ▶) to play that template.
-5. **×N** — opens the **Repeat** card for the last template: choose how many times it must be played
+5. **LIST** — opens the template list above the current app: tap a row (or its ▶) to play that template.
+6. **×N** — opens the **Repeat** card for the last template: choose how many times it must be played
    (1× / 3× / 5× / 10× / 50× / **∞**) and how long the engine waits between two passes (0 s / 0.5 s / 1 s / 3 s / 10 s),
    then press **PLAY**. The choice is stored in the template itself, so the next **PLAY** (from the panel or from the
    app) uses the same repeat. The button label always shows the current choice (`5×`, `∞`).
@@ -230,10 +240,11 @@ Dependency flow of the vendored code (`A ──▶ B` means *A depends on B*):
 
 ## Known limitations
 
-- Live tap recording captures taps only (no duration, movement or extra fingers), a platform limitation.
-- The tap recorder of the panel is the only recording mode offered by the UI. The gesture recorder (swipes, long press,
-  multi finger) is still in the code (`RecordingController.startGestureCapture`) but has no entry point anymore: a
-  dimmed overlay blocks the app underneath while it records.
+- Live tap recording captures taps only (no duration, movement or extra fingers), a platform limitation: for swipes and
+  multi-finger gestures, hold the **REC** button of the panel to record gestures instead.
+- The floating panel only records **taps** (a platform limitation of the pass-through watcher) unless **REC** is held, in
+  which case the gestures drawn on the dimmed overlay are recorded instead — the app underneath is blocked during that
+  mode.
 - Idle time between actions is clamped to the engine's maximum delay (1 hour); a single gesture is limited to ~59 s.
 - After a reboot the accessibility service reconnects only once the device has been unlocked for the first time: Android
   ignores accessibility services that are not `directBootAware` while the credential-encrypted storage is locked, and

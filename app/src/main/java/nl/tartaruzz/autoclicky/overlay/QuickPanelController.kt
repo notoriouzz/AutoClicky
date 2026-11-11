@@ -228,6 +228,7 @@ class QuickPanelController @Inject constructor(
         val newOverlay = QuickPanelOverlay(
             service = service,
             onRecordClicked = ::onRecordClicked,
+            onRecordGestureClicked = ::onRecordGestureClicked,
             onStopClicked = ::onStopClicked,
             onPlayClicked = ::onPlayClicked,
             onRepeatClicked = ::onRepeatClicked,
@@ -248,6 +249,24 @@ class QuickPanelController @Inject constructor(
 
         if (!recordingController.startTapCapture()) {
             showMessage("Cannot start the recording, is the accessibility service enabled?")
+        } else {
+            showMessage("Recording TAPS — use your apps, then press STOP")
+        }
+    }
+
+    /** Holding the REC button records gestures instead of taps: they are drawn on a dimmed overlay. */
+    private fun onRecordGestureClicked() {
+        if (recordingController.isRecording.value) return
+
+        if (engineController.isRunning.value) {
+            showMessage("Stop the running template before recording")
+            return
+        }
+
+        if (!recordingController.startGestureCapture()) {
+            showMessage("Cannot start the recording, is the accessibility service enabled?")
+        } else {
+            showMessage("Recording GESTURES — draw them on the screen, then press STOP")
         }
     }
 
@@ -370,7 +389,7 @@ class QuickPanelController @Inject constructor(
 
         val overlay = SaveRecordingOverlay(
             service = service,
-            actionCount = recording.actions.size,
+            summary = recording.summary,
             recordingName = defaultRecordingName(),
             initialRepeat = engineController.repeatSetting.value,
             onSave = { repeat -> saveRecording(recording, repeat) },

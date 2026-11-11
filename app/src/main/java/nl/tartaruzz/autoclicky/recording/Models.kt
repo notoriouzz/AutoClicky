@@ -86,12 +86,29 @@ sealed interface RecordedAction {
     ) : RecordedAction
 }
 
+/** What a capture is recording, so the UI can tell the user which mode is active. */
+enum class RecordingMode(private val singular: String, private val plural: String) {
+
+    /** Taps performed in the app, captured through the pass-through watcher. */
+    TAPS("tap", "taps"),
+
+    /** Gestures drawn on the dimmed overlay of the screen. */
+    GESTURES("gesture", "gestures");
+
+    /** "1 tap", "12 taps", "3 gestures": the label of a capture of [count] actions. */
+    fun label(count: Int): String = if (count == 1) singular else plural
+}
+
 /** A finished recording, ready to be saved as a scenario (the AutoClicky template). */
 data class CompletedRecording(
     val actions: List<RecordedAction>,
+    val mode: RecordingMode = RecordingMode.TAPS,
 ) {
 
     val isEmpty: Boolean get() = actions.isEmpty()
+
+    /** "12 taps" or "1 gesture", for the cards and the messages. */
+    val summary: String get() = "${actions.size} ${mode.label(actions.size)}"
 }
 
 /** A raw touch sample, as collected from the Android views or from the accessibility service overlay. */
