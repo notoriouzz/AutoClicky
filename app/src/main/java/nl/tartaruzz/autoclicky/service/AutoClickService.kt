@@ -21,6 +21,7 @@ package nl.tartaruzz.autoclicky.service
 
 import android.accessibilityservice.AccessibilityService
 import android.content.Intent
+import android.util.Log
 import android.view.accessibility.AccessibilityEvent
 
 import com.buzbuz.smartautoclicker.core.common.actions.AndroidActionExecutor
@@ -51,11 +52,14 @@ class AutoClickService : AccessibilityService() {
 
     override fun onServiceConnected() {
         super.onServiceConnected()
+        Log.i(TAG, "Accessibility service connected")
 
         androidActionExecutor.init(this)
         recordingController.attach(this)
         quickPanelController.attach(this)
         engineController.onAccessibilityServiceConnected()
+
+        Log.i(TAG, "Accessibility service ready")
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) = Unit
@@ -63,6 +67,8 @@ class AutoClickService : AccessibilityService() {
     override fun onInterrupt() = Unit
 
     override fun onUnbind(intent: Intent?): Boolean {
+        Log.i(TAG, "Accessibility service unbound")
+
         quickPanelController.detach()
         recordingController.detach()
         engineController.onAccessibilityServiceDisconnected()
@@ -71,3 +77,5 @@ class AutoClickService : AccessibilityService() {
         return super.onUnbind(intent)
     }
 }
+
+private const val TAG = "AutoClickService"

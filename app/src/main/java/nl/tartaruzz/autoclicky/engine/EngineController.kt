@@ -19,14 +19,18 @@
 
 package nl.tartaruzz.autoclicky.engine
 
+import android.util.Log
+
 import com.buzbuz.smartautoclicker.core.dumb.domain.IDumbRepository
 import com.buzbuz.smartautoclicker.core.dumb.domain.model.DumbScenario
 import com.buzbuz.smartautoclicker.core.dumb.engine.DumbEngine
 
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -67,25 +71,34 @@ class EngineController @Inject constructor(
     val isAccessibilityServiceConnected: StateFlow<Boolean> = _isAccessibilityServiceConnected
 
     fun onAccessibilityServiceConnected() {
+        Log.i(TAG, "Accessibility service connected")
         _isAccessibilityServiceConnected.value = true
     }
 
     fun onAccessibilityServiceDisconnected() {
+        Log.i(TAG, "Accessibility service disconnected")
         _isAccessibilityServiceConnected.value = false
         dumbEngine.release()
     }
+
+    /**
+     * The vendored data source runs blocking DAO queries (for example `getDumbActions` while inserting the actions of a
+     * scenario), and Room refuses to run those on the main thread. Every database access therefore goes through the IO
+     * dispatcher, whatever the context of the caller is.
+     */
+    private suspend fun <T> onDatabase(block: suspend () -> T): T = withContext(Dispatchers.IO) { block() }
 
     /**
      * Persist a new scenario.
      *
      * @return the database id of the inserted scenario, or null if it could not be found after the insertion.
      */
-    suspend fun addScenario(scenario: DumbScenario): Long? {
+    suspend fun addScenario(scenario: DumbScenario): Long? = onDatabase {
         val knownIds = dumbRepository.dumbScenarios.first().map { it.id.databaseId }.toSet()
 
         dumbRepository.addDumbScenario(scenario)
 
-        return dumbRepository.dumbScenarios.first()
+        dumbRepository.dumbScenarios.first()
             .firstOrNull { storedScenario -> storedScenario.id.databaseId !in knownIds }
             ?.id?.databaseId
     }
@@ -96,7 +109,7 @@ class EngineController @Inject constructor(
     suspend fun startScenario(scenarioDbId: Long): Boolean {
         if (!_isAccessibilityServiceConnected.value) return false
 
-        val scenario = dumbRepository.getDumbScenario(scenarioDbId) ?: return false
+        val scenario = onDatabase { dumbRepository.getDumbScenario(scenarioDbId) } ?: return false
         if (!scenario.isValid()) return false
 
         dumbEngine.init(scenario)
@@ -114,7 +127,8 @@ class EngineController @Inject constructor(
         val lastStartedId = _lastStartedScenarioId.value
         if (lastStartedId != null && startScenario(lastStartedId)) return true
 
-        val fallbackId = dumbRepository.dumbScenarios.first().firstOrNull()?.id?.databaseId ?: return false
+        val fallbackId = onDatabase { dumbRepository.dumbScenarios.first().firstOrNull()?.id?.databaseId }
+            ?: return false
         return startScenario(fallbackId)
     }
 
@@ -127,7 +141,7 @@ class EngineController @Inject constructor(
         val trimmedName = newName.trim()
         if (trimmedName.isEmpty() || trimmedName == scenario.name) return
 
-        dumbRepository.updateDumbScenario(scenario.copy(name = trimmedName))
+        onDatabase { dumbRepository.updateDumbScenario(scenario.copy(name = trimmedName)) }
     }
 
     /** Store a copy of [scenario] under [copyName]. */
@@ -138,6 +152,8 @@ class EngineController @Inject constructor(
     suspend fun deleteScenario(scenario: DumbScenario) {
         if (dumbEngine.isRunning.value) return
 
-        dumbRepository.deleteDumbScenario(scenario)
+        onDatabase { dumbRepository.deleteDumbScenario(scenario) }
     }
 }
+
+private const val TAG = "EngineController"

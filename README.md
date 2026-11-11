@@ -207,6 +207,9 @@ Dependency flow of the vendored code (`A ──▶ B` means *A depends on B*):
 - Live tap recording captures taps only (no duration, movement or extra fingers), a platform limitation.
 - Gesture recording blocks the app underneath while it is active.
 - Idle time between actions is clamped to the engine's maximum delay (1 hour); a single gesture is limited to ~59 s.
+- After a reboot the accessibility service reconnects only once the device has been unlocked for the first time: Android
+  ignores accessibility services that are not `directBootAware` while the credential-encrypted storage is locked, and
+  AutoClicky cannot opt in because its templates live in the credential-encrypted database.
 - The floating panel only records **taps** (the same platform limitation as *Record taps*); for swipes and multi-finger
   gestures use *Record gestures* in the activity. A recording made from the panel is kept in memory until you open
   AutoClicky and save it.
