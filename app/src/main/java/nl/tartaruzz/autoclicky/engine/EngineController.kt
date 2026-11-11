@@ -1,4 +1,4 @@
-tor/*
+/*
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
  * Copyright (C) 2026 AutoClicky contributors
@@ -94,14 +94,21 @@ class EngineController @Inject constructor(
      *
      * @return the database id of the inserted scenario, or null if it could not be found after the insertion.
      */
-    suspend fun addScenario(scenario: DumbScenario): Long? = onDatabase {
-        val knownIds = dumbRepository.dumbScenarios.first().map { it.id.databaseId }.toSet()
+    suspend fun addScenario(scenario: DumbScenario): Long? {
+        val newScenarioId = onDatabase {
+            val knownIds = dumbRepository.dumbScenarios.first().map { it.id.databaseId }.toSet()
 
-        dumbRepository.addDumbScenario(scenario)
+            dumbRepository.addDumbScenario(scenario)
 
-        dumbRepository.dumbScenarios.first()
-            .firstOrNull { storedScenario -> storedScenario.id.databaseId !in knownIds }
-            ?.id?.databaseId
+            dumbRepository.dumbScenarios.first()
+                .firstOrNull { storedScenario -> storedScenario.id.databaseId !in knownIds }
+                ?.id?.databaseId
+        }
+
+        // The PLAY button of the floating panel must replay the recording that was just saved.
+        if (newScenarioId != null) _lastStartedScenarioId.value = newScenarioId
+
+        return newScenarioId
     }
 
     /**

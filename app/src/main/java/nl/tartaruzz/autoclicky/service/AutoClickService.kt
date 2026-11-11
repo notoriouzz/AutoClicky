@@ -62,7 +62,13 @@ class AutoClickService : AccessibilityService() {
         Log.i(TAG, "Accessibility service ready")
     }
 
-    override fun onAccessibilityEvent(event: AccessibilityEvent?) = Unit
+    override fun onAccessibilityEvent(event: AccessibilityEvent?) {
+        val safeEvent = event ?: return
+
+        if (safeEvent.eventType == AccessibilityEvent.TYPE_VIEW_CLICKED) {
+            recordingController.onViewClicked(safeEvent)
+        }
+    }
 
     override fun onInterrupt() = Unit
 

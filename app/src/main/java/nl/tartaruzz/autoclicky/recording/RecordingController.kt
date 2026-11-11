@@ -20,11 +20,15 @@
 package nl.tartaruzz.autoclicky.recording
 
 import android.accessibilityservice.AccessibilityService
+import android.graphics.Rect
+import android.view.accessibility.AccessibilityEvent
 
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import javax.inject.Inject
 import javax.inject.Singleton
+
+import kotlin.math.abs
 
 /**
  * Drives the recording overlays and exposes the finished recording to the UI.
@@ -134,19 +138,65 @@ class RecordingController @Inject constructor() {
         return completed
     }
 
-    private fun onTapRecorded(x: Float, y: Float, eventTimeMs: Long) {
-        tapActions.add(
-            RecordedAction.Tap(
-                startTimeMs = eventTimeMs,
-                endTimeMs = eventTimeMs + TAP_PRESS_DURATION_MS,
-                x = x,
-                y = y,
-            )
-        )
+    /**
+     * Record the click of a view, reported by the accessibility service.
+     *
+     * This is the reliable source for the position of a tap: `ACTION_OUTSIDE` reports no coordinates on several devices
+     * (Samsung reports 0,0), while the click event carries the screen bounds of the view that was clicked.
+     */
+    fun onViewClicked(event: AccessibilityEvent) {
+        if (!_isRecording.value) return
+
+        val source = event.source ?: return
+        val bounds = Rect()
+
+        try {
+            source.getBoundsInScreen(bounds)
+        } catch (_: IllegalStateException) {
+            // The node has been detached in the meantime.
+            return
+        }
+
+        if (bounds.isEmpty) return
+
+        addTap(bounds.exactCenterX(), bounds.exactCenterY(), event.eventTime, fromView = true)
     }
+
+    private fun onTapRecorded(x: Float, y: Float, eventTimeMs: Long) {
+        addTap(x, y, eventTimeMs, fromView = false)
+    }
+
+    /**
+     * Store a tap, keeping a single action per gesture.
+     *
+     * A gesture is reported twice: by the outside touch watcher and by the accessibility click event of the view that
+     * received it. The view bounds are preferred, and a touch reported at (0,0) (no coordinates available) is dropped.
+     */
+    private fun addTap(x: Float, y: Float, eventTimeMs: Long, fromView: Boolean) {
+        if (x == 0f && y == 0f) return
+
+        val existingIndex = tapActions.indexOfLast { tap -> abs(tap.startTimeMs - eventTimeMs) <= TAP_DEDUP_DURATION_MS }
+        if (existingIndex >= 0) {
+            if (fromView) tapActions[existingIndex] = tapAt(x, y, eventTimeMs)
+            return
+        }
+
+        tapActions.add(tapAt(x, y, eventTimeMs))
+    }
+
+    private fun tapAt(x: Float, y: Float, eventTimeMs: Long): RecordedAction.Tap =
+        RecordedAction.Tap(
+            startTimeMs = eventTimeMs,
+            endTimeMs = eventTimeMs + TAP_PRESS_DURATION_MS,
+            x = x,
+            y = y,
+        )
 
     private companion object {
         /** The outside touches do not carry their duration: use the same default as the quick click scenario. */
         const val TAP_PRESS_DURATION_MS = 50L
+
+        /** A touch and the click event of the same gesture never arrive more than this apart. */
+        const val TAP_DEDUP_DURATION_MS = 300L
     }
 }

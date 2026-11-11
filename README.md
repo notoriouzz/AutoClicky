@@ -227,6 +227,13 @@ Dependency flow of the vendored code (`A ──▶ B` means *A depends on B*):
   which on several devices hides the buttons and leaves the card blocking the screen.
 - Templates replay at the absolute screen coordinates they were recorded at: keep the target app in the same orientation
   and layout, and bring it to the foreground before pressing PLAY.
+- Tap recording stores the **centre of the clicked view** (from the accessibility click event), not the raw touch point:
+  `ACTION_OUTSIDE` reports no coordinates at all on several devices (Samsung reports `0,0`, which made every recorded tap
+  land in the top left corner). Taps on a surface that no view handles — canvas games for instance — are therefore not
+  recorded.
+- A template replays **all** its actions, including the last one. Ending a recording with a "clear" action (for instance
+  `AC` on a calculator, or "back" in an app) means the screen looks unchanged after the playback: choose a last action
+  that leaves something visible if you want to check the result.
 - The vendored overlay **menu** modules (`OverlayManager`, `ItemsBriefMenu`, …) compile and are available, but AutoClicky
   does not show Klick'r's menu: the recorder and the floating panel use their own lightweight windows.
 

@@ -1,4 +1,4 @@
-tor/*
+/*
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
  * Copyright (C) 2026 AutoClicky contributors
@@ -24,11 +24,9 @@ import android.graphics.Color
 import android.graphics.PixelFormat
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
-import android.text.InputType
+import android.text.TextUtils
 import android.view.Gravity
 import android.view.WindowManager
-import android.view.inputmethod.EditorInfo
-import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -36,27 +34,26 @@ import android.widget.TextView
 import kotlin.math.roundToInt
 
 /**
- * Asks for the name of the recording that was just captured, above the app the user is currently in.
+ * Offers to save the recording that was just captured, above the app the user is in.
  *
  * This is the floating counterpart of the "Save recording" dialog of the activity: it is displayed as soon as a capture
- * ends, so a recording started from the panel can be saved without going back to AutoClicky. The window is a focusable
- * [WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY] window, which is what allows the soft keyboard to be used
- * inside an accessibility overlay.
+ * ends, so a recording started from the panel can be saved without going back to AutoClicky.
  *
- * Saving with the prefilled name requires a single tap: the text field is only there to change it.
+ * The card deliberately has no text field: an editable text opens the keyboard inside the overlay window, which on
+ * several devices leaves the buttons unreachable and the card blocking the whole screen. It shows the proposed name with
+ * a large SAVE and DISCARD button anchored above the navigation bar; the template can be renamed in the activity.
  */
 class SaveRecordingOverlay(
     private val service: AccessibilityService,
     private val actionCount: Int,
-    private val defaultName: String,
-    private val onSave: (name: String) -> Unit,
+    private val recordingName: String,
+    private val onSave: () -> Unit,
     private val onCancel: () -> Unit,
 ) {
 
     private val windowManager: WindowManager? = service.getSystemService(WindowManager::class.java)
 
     private var rootView: FrameLayout? = null
-    private var nameField: EditText? = null
 
     /** Attach the card. Returns false when the window manager refused the window. */
     fun show(): Boolean {
@@ -68,14 +65,11 @@ class SaveRecordingOverlay(
             WindowManager.LayoutParams.MATCH_PARENT,
             WindowManager.LayoutParams.MATCH_PARENT,
             WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
-            WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+            WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
             PixelFormat.TRANSLUCENT,
         ).apply {
             gravity = Gravity.CENTER
-            // An overlay window is not resized by the system when the keyboard opens: raising it instead keeps the
-            // buttons above the keyboard, which would otherwise hide them and leave the card blocking the screen.
-            softInputMode = WindowManager.LayoutParams.SOFT_INPUT_ADJUST_PAN or
-                WindowManager.LayoutParams.SOFT_INPUT_STATE_UNCHANGED
         }
 
         val added = try {
@@ -99,7 +93,6 @@ class SaveRecordingOverlay(
         val root = rootView ?: return
 
         rootView = null
-        nameField = null
 
         try {
             windowManager.removeView(root)
@@ -111,24 +104,22 @@ class SaveRecordingOverlay(
     private fun buildRoot(): FrameLayout {
         val root = FrameLayout(service).apply {
             setBackgroundColor(SCRIM_COLOR)
-            isClickable = true // Swallows the touches made outside of the card.
-            setOnClickListener { onCancel() } // Always a way out: a touch outside the card cancels.
+            isClickable = true
+            setOnClickListener { onCancel() } // A touch outside the card just closes it.
         }
 
         val card = LinearLayout(service).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(toPx(20), toPx(18), toPx(20), toPx(14))
+            setPadding(toPx(20), toPx(18), toPx(20), toPx(18))
             background = roundedBackground(CARD_COLOR, 20)
-            minimumWidth = toPx(280)
-            // Anchored in the upper part of the screen: the keyboard never covers the buttons of an overlay window.
             layoutParams = FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.WRAP_CONTENT,
+                (service.resources.displayMetrics.widthPixels * CARD_WIDTH_RATIO).toInt(),
                 FrameLayout.LayoutParams.WRAP_CONTENT,
             ).apply {
-                gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
-                topMargin = toPx(CARD_TOP_MARGIN_DP)
+                gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
+                bottomMargin = toPx(CARD_BOTTOM_MARGIN_DP)
             }
-            isClickable = true // Keeps the touches made on the card from cancelling it.
+            isClickable = true
         }
 
         card.addView(
@@ -148,65 +139,45 @@ class SaveRecordingOverlay(
             }
         )
 
-        card.addView(buildNameField())
+        card.addView(
+            TextView(service).apply {
+                text = recordingName
+                setTextColor(Color.WHITE)
+                textSize = NAME_TEXT_SIZE_SP
+                isSingleLine = true
+                ellipsize = TextUtils.TruncateAt.END
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                ).apply { topMargin = toPx(10) }
+            }
+        )
 
         card.addView(buildButtons())
-
         root.addView(card)
         return root
     }
 
-    private fun buildNameField(): EditText =
-        EditText(service).apply {
-            setText(defaultName)
-            setSelection(defaultName.length)
-            setSingleLine(true)
-            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
-            imeOptions = EditorInfo.IME_ACTION_DONE
-            hint = "Template name"
-            setTextColor(Color.WHITE)
-            setHintTextColor(MUTED_TEXT_COLOR)
-            textSize = FIELD_TEXT_SIZE_SP
-            background = roundedBackground(FIELD_COLOR, 12)
-            setPadding(toPx(14), toPx(10), toPx(14), toPx(10))
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-            ).apply { topMargin = toPx(14) }
-            // The "done" key of the keyboard saves too, whatever the keyboard does to the layout.
-            setOnEditorActionListener { _, actionId, _ ->
-                if (actionId == EditorInfo.IME_ACTION_DONE) {
-                    onSave(currentName())
-                    true
-                } else {
-                    false
-                }
-            }
-        }.also { field -> nameField = field }
-
     private fun buildButtons(): LinearLayout =
         LinearLayout(service).apply {
             orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.END
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT,
-            ).apply { topMargin = toPx(16) }
+            ).apply { topMargin = toPx(18) }
 
             addView(
                 actionButton(
-                    label = "Cancel",
-                    backgroundColor = Color.TRANSPARENT,
-                    textColor = MUTED_TEXT_COLOR,
+                    label = "DISCARD",
+                    backgroundColor = DISCARD_COLOR,
                     onClick = { onCancel() },
                 )
             )
             addView(
                 actionButton(
-                    label = "Save",
+                    label = "SAVE",
                     backgroundColor = SAVE_COLOR,
-                    textColor = Color.WHITE,
-                    onClick = { onSave(currentName()) },
+                    onClick = { onSave() },
                 )
             )
         }
@@ -214,28 +185,22 @@ class SaveRecordingOverlay(
     private fun actionButton(
         label: String,
         backgroundColor: Int,
-        textColor: Int,
         onClick: () -> Unit,
     ): TextView = TextView(service).apply {
         text = label
-        setTextColor(textColor)
+        setTextColor(Color.WHITE)
         textSize = BUTTON_TEXT_SIZE_SP
         typeface = Typeface.DEFAULT_BOLD
         gravity = Gravity.CENTER
         includeFontPadding = false
-        setPadding(toPx(18), toPx(10), toPx(18), toPx(10))
-        if (backgroundColor != Color.TRANSPARENT) {
-            background = roundedBackground(backgroundColor, 14)
-        }
+        background = roundedBackground(backgroundColor, 16)
         isClickable = true
-        layoutParams = LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.WRAP_CONTENT,
-            LinearLayout.LayoutParams.WRAP_CONTENT,
-        ).apply { marginStart = toPx(8) }
+        layoutParams = LinearLayout.LayoutParams(0, toPx(BUTTON_HEIGHT_DP), 1f).apply {
+            marginStart = toPx(BUTTON_SPACING_DP / 2)
+            marginEnd = toPx(BUTTON_SPACING_DP / 2)
+        }
         setOnClickListener { onClick() }
     }
-
-    private fun currentName(): String = nameField?.text?.toString().orEmpty()
 
     private fun roundedBackground(color: Int, cornerRadiusDp: Int): GradientDrawable =
         GradientDrawable().apply {
@@ -249,14 +214,18 @@ class SaveRecordingOverlay(
     private companion object {
         val SCRIM_COLOR: Int = Color.parseColor("#99000000")
         val CARD_COLOR: Int = Color.parseColor("#FF25252A")
-        val FIELD_COLOR: Int = Color.parseColor("#33FFFFFF")
-        val SAVE_COLOR: Int = Color.parseColor("#FF3949AB")
+        val DISCARD_COLOR: Int = Color.parseColor("#FF3A3A40")
+        val SAVE_COLOR: Int = Color.parseColor("#FF2E7D32")
         val MUTED_TEXT_COLOR: Int = Color.parseColor("#B3FFFFFF")
+
+        const val CARD_WIDTH_RATIO = 0.9f
+        const val CARD_BOTTOM_MARGIN_DP = 56
+        const val BUTTON_HEIGHT_DP = 56
+        const val BUTTON_SPACING_DP = 12
 
         const val TITLE_TEXT_SIZE_SP = 18f
         const val SUBTITLE_TEXT_SIZE_SP = 12f
-        const val FIELD_TEXT_SIZE_SP = 15f
-        const val BUTTON_TEXT_SIZE_SP = 14f
-        const val CARD_TOP_MARGIN_DP = 88
+        const val NAME_TEXT_SIZE_SP = 14f
+        const val BUTTON_TEXT_SIZE_SP = 15f
     }
 }
