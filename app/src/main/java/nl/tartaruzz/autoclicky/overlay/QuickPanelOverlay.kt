@@ -32,6 +32,8 @@ import android.view.WindowManager
 import android.widget.LinearLayout
 import android.widget.TextView
 
+import androidx.core.view.doOnLayout
+
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
@@ -66,10 +68,10 @@ class QuickPanelOverlay(
     /** True while the panel window is attached to the window manager. */
     val isShown: Boolean get() = panelView != null
 
-    /** Attach the panel, or do nothing if it is already displayed. */
-    fun show() {
-        val windowManager = windowManager ?: return
-        if (panelView != null) return
+    /** Attach the panel. Returns false when the window manager refused the window. */
+    fun show(): Boolean {
+        val windowManager = windowManager ?: return false
+        if (panelView != null) return true
 
         val params = panelLayoutParams()
         val panel = buildPanel(params)
@@ -83,13 +85,14 @@ class QuickPanelOverlay(
             false
         }
 
-        if (!added) return
+        if (!added) return false
 
         panelView = panel
         panelParams = params
 
-        // The window size is only known after the first layout pass: place it in the top right corner from there.
-        panel.post { positionPanelIfNeeded(panel) }
+        // The window size is only known once laid out: place it in the top right corner from there.
+        panel.doOnLayout { positionPanelIfNeeded(panel) }
+        return true
     }
 
     /** Detach the panel from the window manager. */

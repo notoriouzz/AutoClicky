@@ -68,6 +68,7 @@ class QuickPanelController @Inject constructor(
 
     private var isVisibleRequested = false
     private var isDismissedForCurrentRun = false
+    private var hasReportedPanelFailure = false
     private var lastState = PanelState()
 
     private val _isPanelRequested = MutableStateFlow(false)
@@ -151,7 +152,12 @@ class QuickPanelController @Inject constructor(
             (isVisibleRequested || (state.isRunning && !isDismissedForCurrentRun))
 
         if (shouldBeVisible) {
-            showOverlay()
+            if (showOverlay()) {
+                hasReportedPanelFailure = false
+            } else if (!hasReportedPanelFailure) {
+                hasReportedPanelFailure = true
+                showMessage("Cannot display the floating panel, is the accessibility service enabled?")
+            }
         } else {
             overlay?.hide()
         }
@@ -163,13 +169,12 @@ class QuickPanelController @Inject constructor(
         )
     }
 
-    private fun showOverlay() {
-        val service = service ?: return
+    private fun showOverlay(): Boolean {
+        val service = service ?: return false
 
         val existingOverlay = overlay
         if (existingOverlay != null) {
-            existingOverlay.show()
-            return
+            return existingOverlay.show()
         }
 
         val newOverlay = QuickPanelOverlay(
@@ -180,7 +185,7 @@ class QuickPanelController @Inject constructor(
             onHideClicked = ::onHideClicked,
         )
         overlay = newOverlay
-        newOverlay.show()
+        return newOverlay.show()
     }
 
     private fun onRecordClicked() {
