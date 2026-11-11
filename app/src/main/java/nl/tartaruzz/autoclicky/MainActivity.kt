@@ -35,6 +35,7 @@ import androidx.compose.ui.Modifier
 import dagger.hilt.android.AndroidEntryPoint
 
 import nl.tartaruzz.autoclicky.engine.EngineController
+import nl.tartaruzz.autoclicky.overlay.QuickPanelController
 import nl.tartaruzz.autoclicky.recording.RecordingController
 import nl.tartaruzz.autoclicky.ui.AutoClickyScreen
 import nl.tartaruzz.autoclicky.ui.theme.AutoClickyTheme
@@ -46,6 +47,7 @@ class MainActivity : ComponentActivity() {
 
     @Inject lateinit var engineController: EngineController
     @Inject lateinit var recordingController: RecordingController
+    @Inject lateinit var quickPanelController: QuickPanelController
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -59,6 +61,7 @@ class MainActivity : ComponentActivity() {
                     AutoClickyScreen(
                         engineController = engineController,
                         recordingController = recordingController,
+                        quickPanelController = quickPanelController,
                         screenCenter = screenCenter,
                         onOpenAccessibilitySettings = ::openAccessibilitySettings,
                         modifier = Modifier.padding(innerPadding),

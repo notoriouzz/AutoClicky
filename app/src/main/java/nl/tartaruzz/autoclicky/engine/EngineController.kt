@@ -52,6 +52,15 @@ class EngineController @Inject constructor(
     /** The scenario currently played, if any. */
     val runningScenario: Flow<DumbScenario?> = dumbEngine.dumbScenario
 
+    private val _lastStartedScenarioId = MutableStateFlow<Long?>(null)
+
+    /**
+     * Database id of the last scenario that was started, kept in memory only.
+     *
+     * The floating panel uses it to replay the same template without opening the activity.
+     */
+    val lastStartedScenarioId: StateFlow<Long?> = _lastStartedScenarioId
+
     private val _isAccessibilityServiceConnected = MutableStateFlow(false)
 
     /** True when the accessibility service is connected, which is required to execute any gesture. */
@@ -92,7 +101,21 @@ class EngineController @Inject constructor(
 
         dumbEngine.init(scenario)
         dumbEngine.startDumbScenario()
+        _lastStartedScenarioId.value = scenarioDbId
         return true
+    }
+
+    /**
+     * Start the scenario that was played last, falling back to the first stored one.
+     *
+     * @return false if no scenario could be started.
+     */
+    suspend fun startLastUsedScenario(): Boolean {
+        val lastStartedId = _lastStartedScenarioId.value
+        if (lastStartedId != null && startScenario(lastStartedId)) return true
+
+        val fallbackId = dumbRepository.dumbScenarios.first().firstOrNull()?.id?.databaseId ?: return false
+        return startScenario(fallbackId)
     }
 
     fun stopScenario() {

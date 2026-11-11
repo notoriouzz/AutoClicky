@@ -15,6 +15,9 @@ template library are specific to AutoClicky.
   apps, in order, at their real screen coordinates.
 - **Record full gestures** — a dimmed overlay captures taps, long presses, swipes and multi-finger gestures with their
   real timings.
+- **Floating panel above every app** — a small draggable **REC / STOP / PLAY** bar
+  (`TYPE_ACCESSIBILITY_OVERLAY`) stays on top of the app you are using, so you can start a recording, stop it and replay
+  the last template without going back to AutoClicky. It appears on its own while a template is playing.
 - **Templates** — every recording is stored in a Room database and listed in the app: play / stop, duplicate, rename and
   delete.
 - **Quick test** — a one-click "click at the screen center" scenario to check that the accessibility service works.
@@ -114,6 +117,20 @@ be recorded or replayed.
 4. Give the recording a name. It is now a template in the list.
 5. Press **Play** on a template to replay it once (stop it any time with **Stop**).
 
+### Recording and replaying from the floating panel
+
+Tap **Show floating panel** in the main screen (the panel also appears on its own while a template runs). A small
+draggable bar with **REC / STOP / PLAY / X** then stays above every other app:
+
+1. **REC** — starts a tap recording, exactly like *Record taps*: open any app, tap what you want to replay, then press
+   **STOP** on the panel (or the floating **Stop recording** button).
+2. Open AutoClicky: the recording is waiting there, give it a name and save it as a template.
+3. **PLAY** — replays the template that was played last (the first one when none was played yet) above the app you are
+   in. **STOP** stops it, **X** hides the panel for the current run.
+
+The panel is hidden while a capture overlay is active (both recording modes already show their own **Stop recording**
+button) and comes back as soon as the capture ends.
+
 ## How the recording works
 
 ```
@@ -147,6 +164,7 @@ AutoClicky/
 ├── app/                                  AutoClicky application (Compose UI, service, recorder)
 │   └── src/main/java/nl/tartaruzz/autoclicky/
 │       ├── engine/                       EngineController, DefaultScenarioFactory
+│       ├── overlay/                      floating REC / STOP / PLAY panel (QuickPanelOverlay + controller)
 │       ├── recording/                    recorder overlays + pure recording logic
 │       ├── service/AutoClickService.kt   accessibility service (gesture executor host)
 │       └── ui/                           Compose screens
@@ -189,8 +207,11 @@ Dependency flow of the vendored code (`A ──▶ B` means *A depends on B*):
 - Live tap recording captures taps only (no duration, movement or extra fingers), a platform limitation.
 - Gesture recording blocks the app underneath while it is active.
 - Idle time between actions is clamped to the engine's maximum delay (1 hour); a single gesture is limited to ~59 s.
+- The floating panel only records **taps** (the same platform limitation as *Record taps*); for swipes and multi-finger
+  gestures use *Record gestures* in the activity. A recording made from the panel is kept in memory until you open
+  AutoClicky and save it.
 - The vendored overlay **menu** modules (`OverlayManager`, `ItemsBriefMenu`, …) compile and are available, but AutoClicky
-  does not show Klick'r's floating menu yet; the recorder uses its own lightweight windows.
+  does not show Klick'r's menu: the recorder and the floating panel use their own lightweight windows.
 
 ## License
 

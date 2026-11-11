@@ -28,6 +28,7 @@ import com.buzbuz.smartautoclicker.core.common.actions.AndroidActionExecutor
 import dagger.hilt.android.AndroidEntryPoint
 
 import nl.tartaruzz.autoclicky.engine.EngineController
+import nl.tartaruzz.autoclicky.overlay.QuickPanelController
 import nl.tartaruzz.autoclicky.recording.RecordingController
 
 import javax.inject.Inject
@@ -37,8 +38,8 @@ import javax.inject.Inject
  *
  * The Android framework starts it once the user enabled it in the system accessibility settings, and keeps it alive
  * afterwards. It is the only place initializing [AndroidActionExecutor]: no gesture can be dispatched before
- * [onServiceConnected] has been called. It also hosts the recording overlays, which need an accessibility service to be
- * displayed without any extra permission.
+ * [onServiceConnected] has been called. It also hosts the recording overlays and the floating panel, which need an
+ * accessibility service to be displayed above the other apps without any extra permission.
  */
 @AndroidEntryPoint
 class AutoClickService : AccessibilityService() {
@@ -46,12 +47,14 @@ class AutoClickService : AccessibilityService() {
     @Inject lateinit var androidActionExecutor: AndroidActionExecutor
     @Inject lateinit var engineController: EngineController
     @Inject lateinit var recordingController: RecordingController
+    @Inject lateinit var quickPanelController: QuickPanelController
 
     override fun onServiceConnected() {
         super.onServiceConnected()
 
         androidActionExecutor.init(this)
         recordingController.attach(this)
+        quickPanelController.attach(this)
         engineController.onAccessibilityServiceConnected()
     }
 
@@ -60,6 +63,7 @@ class AutoClickService : AccessibilityService() {
     override fun onInterrupt() = Unit
 
     override fun onUnbind(intent: Intent?): Boolean {
+        quickPanelController.detach()
         recordingController.detach()
         engineController.onAccessibilityServiceDisconnected()
         androidActionExecutor.clear()

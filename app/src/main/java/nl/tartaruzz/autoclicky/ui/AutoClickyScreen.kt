@@ -48,6 +48,7 @@ import kotlinx.coroutines.launch
 
 import nl.tartaruzz.autoclicky.engine.DefaultScenarioFactory
 import nl.tartaruzz.autoclicky.engine.EngineController
+import nl.tartaruzz.autoclicky.overlay.QuickPanelController
 import nl.tartaruzz.autoclicky.recording.DumbScenarioBuilder
 import nl.tartaruzz.autoclicky.recording.RecordingController
 
@@ -58,6 +59,7 @@ import java.time.format.DateTimeFormatter
 fun AutoClickyScreen(
     engineController: EngineController,
     recordingController: RecordingController,
+    quickPanelController: QuickPanelController,
     screenCenter: Point,
     onOpenAccessibilitySettings: () -> Unit,
     modifier: Modifier = Modifier,
@@ -70,6 +72,7 @@ fun AutoClickyScreen(
     val isServiceConnected by engineController.isAccessibilityServiceConnected.collectAsState()
     val isRecording by recordingController.isRecording.collectAsState()
     val completedRecording by recordingController.completedRecording.collectAsState()
+    val isPanelRequested by quickPanelController.isPanelRequested.collectAsState()
 
     var recordingName by remember { mutableStateOf("") }
     var renameTarget by remember { mutableStateOf<DumbScenario?>(null) }
@@ -149,6 +152,24 @@ fun AutoClickyScreen(
 
         Button(onClick = onOpenAccessibilitySettings) {
             Text("Open accessibility settings")
+        }
+
+        Text(
+            text = "Floating panel",
+            style = MaterialTheme.typography.titleLarge,
+        )
+
+        Text(
+            text = "A small REC / STOP / PLAY bar that stays above the other apps: start a recording while you use " +
+                "another app, stop it from there, and replay the last template without coming back here.",
+            style = MaterialTheme.typography.bodyMedium,
+        )
+
+        Button(
+            enabled = isServiceConnected,
+            onClick = { quickPanelController.toggle() },
+        ) {
+            Text(if (isPanelRequested) "Hide floating panel" else "Show floating panel")
         }
 
         Text(
