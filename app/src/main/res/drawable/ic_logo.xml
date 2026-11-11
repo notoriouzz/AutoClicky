@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Self contained AutoClicky logo (background included), for use inside the app. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <path android:pathData="M26,0 L82,0 A26,26 0 0 1 108,26 L108,82 A26,26 0 0 1 82,108 L26,108 A26,26 0 0 1 0,82 L0,26 A26,26 0 0 1 26,0 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:endX="108"
+                android:endY="108"
+                android:startX="0"
+                android:startY="0"
+                android:type="linear">
+                <item
+                    android:color="#FF161C4F"
+                    android:offset="0.0" />
+                <item
+                    android:color="#FF283593"
+                    android:offset="0.55" />
+                <item
+                    android:color="#FF3F51B5"
+                    android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M24,54 A30,30 0 1 1 84,54 A30,30 0 1 1 24,54"
+        android:strokeColor="#59FFFFFF"
+        android:strokeWidth="4.5" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M54,24 A30,30 0 0 1 84,54"
+        android:strokeColor="#FF4FC3F7"
+        android:strokeLineCap="round"
+        android:strokeWidth="4.5" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M34.5,54 A19.5,19.5 0 1 1 73.5,54 A19.5,19.5 0 1 1 34.5,54"
+        android:strokeColor="#E6FFFFFF"
+        android:strokeWidth="5" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M46,54 A8,8 0 1 1 62,54 A8,8 0 1 1 46,54" />
+</vector>

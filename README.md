@@ -15,9 +15,12 @@ template library are specific to AutoClicky.
   apps, in order, at their real screen coordinates.
 - **Record full gestures** — a dimmed overlay captures taps, long presses, swipes and multi-finger gestures with their
   real timings.
-- **Floating panel above every app** — a small draggable **REC / STOP / PLAY** bar
-  (`TYPE_ACCESSIBILITY_OVERLAY`) stays on top of the app you are using, so you can start a recording, stop it and replay
-  the last template without going back to AutoClicky. It appears on its own while a template is playing.
+- **Floating panel above every app** — a small draggable **REC / STOP / PLAY / LIST / X** bar
+  (`TYPE_ACCESSIBILITY_OVERLAY`) stays on top of the app you are using: start a recording, stop it, save it on the spot,
+  and pick any stored template to replay — all without going back to AutoClicky. It appears on its own while a template
+  is playing.
+- **Save where you are** — as soon as a capture started from the panel ends, a **Save recording** card with the name
+  field opens above the current app; one tap stores it as a template.
 - **Templates** — every recording is stored in a Room database and listed in the app: play / stop, duplicate, rename and
   delete.
 - **Quick test** — a one-click "click at the screen center" scenario to check that the accessibility service works.
@@ -120,13 +123,19 @@ be recorded or replayed.
 ### Recording and replaying from the floating panel
 
 Tap **Show floating panel** in the main screen (the panel also appears on its own while a template runs). A small
-draggable bar with **REC / STOP / PLAY / X** then stays above every other app:
+draggable bar with **REC / STOP / PLAY / LIST / X** then stays above every other app:
 
 1. **REC** — starts a tap recording, exactly like *Record taps*: open any app, tap what you want to replay, then press
    **STOP** on the panel (or the floating **Stop recording** button).
-2. Open AutoClicky: the recording is waiting there, give it a name and save it as a template.
+2. The **Save recording** card opens immediately, above the app you are in: change the name if you want and tap **Save**
+   — one tap is enough, the proposed name is already filled in. The template is stored right away, without opening
+   AutoClicky. **Cancel** keeps the recording pending, so the main screen still offers to save it.
 3. **PLAY** — replays the template that was played last (the first one when none was played yet) above the app you are
-   in. **STOP** stops it, **X** hides the panel for the current run.
+   in.
+4. **LIST** — opens the template list above the current app: tap a row (or its ▶) to play that template.
+
+**STOP** stops a recording or a running template, **X** hides the panel for the current run. While a template runs, the
+panel stays visible (with the running template's name in the list) so it can be stopped from any app.
 
 The panel is hidden while a capture overlay is active (both recording modes already show their own **Stop recording**
 button) and comes back as soon as the capture ends.
@@ -164,7 +173,7 @@ AutoClicky/
 ├── app/                                  AutoClicky application (Compose UI, service, recorder)
 │   └── src/main/java/nl/tartaruzz/autoclicky/
 │       ├── engine/                       EngineController, DefaultScenarioFactory
-│       ├── overlay/                      floating REC / STOP / PLAY panel (QuickPanelOverlay + controller)
+│       ├── overlay/                      floating panel, save dialog and template picker (accessibility overlays)
 │       ├── recording/                    recorder overlays + pure recording logic
 │       ├── service/AutoClickService.kt   accessibility service (gesture executor host)
 │       └── ui/                           Compose screens
@@ -211,8 +220,10 @@ Dependency flow of the vendored code (`A ──▶ B` means *A depends on B*):
   ignores accessibility services that are not `directBootAware` while the credential-encrypted storage is locked, and
   AutoClicky cannot opt in because its templates live in the credential-encrypted database.
 - The floating panel only records **taps** (the same platform limitation as *Record taps*); for swipes and multi-finger
-  gestures use *Record gestures* in the activity. A recording made from the panel is kept in memory until you open
-  AutoClicky and save it.
+  gestures use *Record gestures* in the activity.
+- Changing the name in the floating **Save recording** card needs the soft keyboard inside an accessibility overlay, which
+  some manufacturers refuse. **Save** always works with the proposed name in that case; rename the template afterwards in
+  the app.
 - The vendored overlay **menu** modules (`OverlayManager`, `ItemsBriefMenu`, …) compile and are available, but AutoClicky
   does not show Klick'r's menu: the recorder and the floating panel use their own lightweight windows.
 

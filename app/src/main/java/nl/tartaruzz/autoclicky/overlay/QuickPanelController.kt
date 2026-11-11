@@ -31,8 +31,13 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 
+import com.buzbuz.smartautoclicker.core.dumb.domain.model.DumbScenario
+
 import nl.tartaruzz.autoclicky.engine.EngineController
+import nl.tartaruzz.autoclicky.recording.CompletedRecording
+import nl.tartaruzz.autoclicky.recording.DumbScenarioBuilder
 import nl.tartaruzz.autoclicky.recording.RecordingController
+import nl.tartaruzz.autoclicky.recording.defaultRecordingName
 
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -42,6 +47,10 @@ import javax.inject.Singleton
  *
  * It lets the user start a recording, stop a recording or a running template, and play the last template without going
  * back to the AutoClicky activity, which is what makes "perform an action in another app and record it" possible.
+ *
+ * It also owns the two dialogs the panel can open above the current app:
+ * - [SaveRecordingOverlay], shown as soon as a capture ends, so the recording can be saved on the spot,
+ * - [ScenarioPickerOverlay], listing the stored templates so one can be chosen and played from anywhere.
  *
  * Visibility rules:
  * - the user can pin the panel from the activity ([setPanelRequested], toggled by [toggle]),
@@ -62,6 +71,8 @@ class QuickPanelController @Inject constructor(
 
     private var service: AccessibilityService? = null
     private var overlay: QuickPanelOverlay? = null
+    private var saveOverlay: SaveRecordingOverlay? = null
+    private var pickerOverlay: ScenarioPickerOverlay? = null
 
     private var stateJob: Job? = null
     private var completedRecordingJob: Job? = null
@@ -70,6 +81,9 @@ class QuickPanelController @Inject constructor(
     private var isDismissedForCurrentRun = false
     private var hasReportedPanelFailure = false
     private var lastState = PanelState()
+
+    /** The recording currently offered in [SaveRecordingOverlay], so it is not displayed twice. */
+    private var offeredRecording: CompletedRecording? = null
 
     private val _isPanelRequested = MutableStateFlow(false)
 
@@ -89,7 +103,7 @@ class QuickPanelController @Inject constructor(
                 PanelState(
                     isRunning = isRunning,
                     isRecording = isRecording,
-                    hasScenarios = scenarios.isNotEmpty(),
+                    scenarios = scenarios,
                 )
             }.collect { state -> onPanelState(state) }
         }
@@ -97,8 +111,11 @@ class QuickPanelController @Inject constructor(
         completedRecordingJob?.cancel()
         completedRecordingJob = scope.launch {
             recordingController.completedRecording.collect { completed ->
-                if (completed != null) {
-                    showMessage("Recording captured, open AutoClicky to save it")
+                if (completed == null) {
+                    // Saved or discarded: the next recording may be offered again.
+                    offeredRecording = null
+                } else if (completed !== offeredRecording) {
+                    showSaveOverlay(completed)
                 }
             }
         }
@@ -111,6 +128,12 @@ class QuickPanelController @Inject constructor(
         stateJob = null
         completedRecordingJob?.cancel()
         completedRecordingJob = null
+
+        saveOverlay?.dismiss()
+        saveOverlay = null
+        pickerOverlay?.dismiss()
+        pickerOverlay = null
+        offeredRecording = null
 
         overlay?.hide()
         overlay = null
@@ -151,6 +174,12 @@ class QuickPanelController @Inject constructor(
         val shouldBeVisible = !state.isRecording &&
             (isVisibleRequested || (state.isRunning && !isDismissedForCurrentRun))
 
+        if (state.isRecording) {
+            // The picker would sit on top of the capture overlay and cannot play anything during a capture.
+            pickerOverlay?.dismiss()
+            pickerOverlay = null
+        }
+
         if (shouldBeVisible) {
             if (showOverlay()) {
                 hasReportedPanelFailure = false
@@ -166,6 +195,7 @@ class QuickPanelController @Inject constructor(
             canRecord = !state.isRunning && !state.isRecording,
             canStop = state.isRunning || state.isRecording,
             canPlay = state.hasScenarios && !state.isRunning && !state.isRecording,
+            canList = !state.isRecording,
         )
     }
 
@@ -182,6 +212,7 @@ class QuickPanelController @Inject constructor(
             onRecordClicked = ::onRecordClicked,
             onStopClicked = ::onStopClicked,
             onPlayClicked = ::onPlayClicked,
+            onListClicked = ::onListClicked,
             onHideClicked = ::onHideClicked,
         )
         overlay = newOverlay
@@ -217,6 +248,79 @@ class QuickPanelController @Inject constructor(
         }
     }
 
+    private fun onListClicked() {
+        val service = service ?: return
+
+        pickerOverlay?.dismiss()
+
+        val picker = ScenarioPickerOverlay(
+            service = service,
+            scenarios = lastState.scenarios,
+            isScenarioEnabled = !lastState.isRunning && !lastState.isRecording,
+            onScenarioSelected = ::onScenarioSelected,
+            onDismissed = { pickerOverlay = null },
+        )
+        pickerOverlay = picker
+
+        if (!picker.show()) {
+            pickerOverlay = null
+            showMessage("Cannot display the template list, is the accessibility service enabled?")
+        }
+    }
+
+    private fun onScenarioSelected(scenario: DumbScenario) {
+        pickerOverlay?.dismiss()
+        pickerOverlay = null
+
+        scope.launch {
+            if (!engineController.startScenario(scenario.id.databaseId)) {
+                showMessage("Cannot play this template, is the accessibility service enabled?")
+            }
+        }
+    }
+
+    /** Offer the recording that was just captured, above the app the user is in. */
+    private fun showSaveOverlay(recording: CompletedRecording) {
+        val service = service ?: return
+
+        offeredRecording = recording
+        saveOverlay?.dismiss()
+
+        val overlay = SaveRecordingOverlay(
+            service = service,
+            actionCount = recording.actions.size,
+            defaultName = defaultRecordingName(),
+            onSave = { name -> saveRecording(recording, name) },
+            onCancel = {
+                saveOverlay?.dismiss()
+                saveOverlay = null
+            },
+        )
+        saveOverlay = overlay
+
+        if (!overlay.show()) {
+            saveOverlay = null
+            showMessage("Cannot display the save dialog, open AutoClicky to save the recording")
+        }
+    }
+
+    private fun saveRecording(recording: CompletedRecording, name: String) {
+        saveOverlay?.dismiss()
+        saveOverlay = null
+
+        scope.launch {
+            val templateName = name.trim().ifEmpty { defaultRecordingName() }
+            val scenarioId = engineController.addScenario(DumbScenarioBuilder.build(templateName, recording.actions))
+            recordingController.consumeCompletedRecording()
+
+            if (scenarioId == null) {
+                showMessage("Could not save the recording")
+            } else {
+                showMessage("Saved: $templateName")
+            }
+        }
+    }
+
     private fun onHideClicked() {
         isVisibleRequested = false
         _isPanelRequested.value = false
@@ -237,6 +341,8 @@ class QuickPanelController @Inject constructor(
     private data class PanelState(
         val isRunning: Boolean = false,
         val isRecording: Boolean = false,
-        val hasScenarios: Boolean = false,
-    )
+        val scenarios: List<DumbScenario> = emptyList(),
+    ) {
+        val hasScenarios: Boolean get() = scenarios.isNotEmpty()
+    }
 }

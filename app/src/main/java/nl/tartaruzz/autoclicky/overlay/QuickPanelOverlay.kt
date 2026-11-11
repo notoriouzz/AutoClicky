@@ -40,7 +40,7 @@ import kotlin.math.roundToInt
 /**
  * Minimal floating control panel, displayed above every other app.
  *
- * The panel is a small rounded bar with REC / STOP / PLAY / X buttons. Like the recording overlays it is a
+ * The panel is a small rounded bar with REC / STOP / PLAY / LIST / X buttons. Like the recording overlays it is a
  * [WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY] window: this window type belongs to the accessibility service
  * and is exempt from [android.Manifest.permission.SYSTEM_ALERT_WINDOW], so no overlay permission is needed and the panel
  * always ends up on top of whatever app is in the foreground.
@@ -52,6 +52,7 @@ class QuickPanelOverlay(
     private val onRecordClicked: () -> Unit,
     private val onStopClicked: () -> Unit,
     private val onPlayClicked: () -> Unit,
+    private val onListClicked: () -> Unit,
     private val onHideClicked: () -> Unit,
 ) {
 
@@ -64,6 +65,7 @@ class QuickPanelOverlay(
     private var recordButton: TextView? = null
     private var stopButton: TextView? = null
     private var playButton: TextView? = null
+    private var listButton: TextView? = null
 
     /** True while the panel window is attached to the window manager. */
     val isShown: Boolean get() = panelView != null
@@ -106,6 +108,7 @@ class QuickPanelOverlay(
         recordButton = null
         stopButton = null
         playButton = null
+        listButton = null
 
         try {
             windowManager.removeView(panel)
@@ -115,10 +118,11 @@ class QuickPanelOverlay(
     }
 
     /** Reflect the state of the recorder and of the engine on the panel buttons. */
-    fun setEnabledState(canRecord: Boolean, canStop: Boolean, canPlay: Boolean) {
+    fun setEnabledState(canRecord: Boolean, canStop: Boolean, canPlay: Boolean, canList: Boolean) {
         recordButton?.setButtonEnabled(canRecord)
         stopButton?.setButtonEnabled(canStop)
         playButton?.setButtonEnabled(canPlay)
+        listButton?.setButtonEnabled(canList)
     }
 
     @SuppressLint("ClickableViewAccessibility") // Every button handles its own touch events, see DragTouchListener.
@@ -135,9 +139,11 @@ class QuickPanelOverlay(
         recordButton = actionButton("REC", RECORD_COLOR, "Record the taps made in any app", params, onRecordClicked)
         stopButton = actionButton("STOP", STOP_COLOR, "Stop recording or playing", params, onStopClicked)
         playButton = actionButton("PLAY", PLAY_COLOR, "Play the last template", params, onPlayClicked)
+        listButton = actionButton("\u2261", LIST_COLOR, "Choose and play a template", params, onListClicked)
         val hideButton = actionButton("X", HIDE_COLOR, "Hide the AutoClicky panel", params, onHideClicked)
 
-        listOfNotNull(recordButton, stopButton, playButton, hideButton).forEach { button -> panel.addView(button) }
+        listOfNotNull(recordButton, stopButton, playButton, listButton, hideButton)
+            .forEach { button -> panel.addView(button) }
 
         return panel
     }
@@ -291,6 +297,7 @@ class QuickPanelOverlay(
         val RECORD_COLOR: Int = Color.parseColor("#C62828")
         val STOP_COLOR: Int = Color.parseColor("#546E7A")
         val PLAY_COLOR: Int = Color.parseColor("#2E7D32")
+        val LIST_COLOR: Int = Color.parseColor("#3949AB")
         val HIDE_COLOR: Int = Color.parseColor("#424242")
 
         const val PANEL_PADDING_DP = 6
@@ -299,10 +306,10 @@ class QuickPanelOverlay(
         const val PANEL_MARGIN_DP = 12
         const val PANEL_TOP_MARGIN_DP = 160
 
-        const val BUTTON_SIZE_DP = 44
+        const val BUTTON_SIZE_DP = 40
         const val BUTTON_CORNER_RADIUS_DP = 18
-        const val BUTTON_SPACING_DP = 6
-        const val BUTTON_TEXT_SIZE_SP = 11f
+        const val BUTTON_SPACING_DP = 4
+        const val BUTTON_TEXT_SIZE_SP = 10f
 
         const val DISABLED_ALPHA = 0.35f
     }

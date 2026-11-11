@@ -68,8 +68,8 @@ android {
         applicationId = "nl.tartaruzz.autoclicky"
         minSdk = 36
         targetSdk = 37
-        versionCode = 5
-        versionName = "1.1.3"
+        versionCode = 6
+        versionName = "1.2"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

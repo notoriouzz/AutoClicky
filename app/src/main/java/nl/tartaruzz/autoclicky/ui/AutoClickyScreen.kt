@@ -21,10 +21,13 @@ package nl.tartaruzz.autoclicky.ui
 
 import android.graphics.Point
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
@@ -39,21 +42,22 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 
 import com.buzbuz.smartautoclicker.core.dumb.domain.model.DumbScenario
 
 import kotlinx.coroutines.launch
 
+import nl.tartaruzz.autoclicky.R
 import nl.tartaruzz.autoclicky.engine.DefaultScenarioFactory
 import nl.tartaruzz.autoclicky.engine.EngineController
 import nl.tartaruzz.autoclicky.overlay.QuickPanelController
 import nl.tartaruzz.autoclicky.recording.DumbScenarioBuilder
 import nl.tartaruzz.autoclicky.recording.RecordingController
-
-import java.time.LocalDateTime
-import java.time.format.DateTimeFormatter
+import nl.tartaruzz.autoclicky.recording.defaultRecordingName
 
 @Composable
 fun AutoClickyScreen(
@@ -136,10 +140,20 @@ fun AutoClickyScreen(
             .padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Text(
-            text = "AutoClicky",
-            style = MaterialTheme.typography.headlineMedium,
-        )
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Image(
+                painter = painterResource(R.drawable.ic_logo),
+                contentDescription = null,
+                modifier = Modifier.size(44.dp),
+            )
+            Text(
+                text = "AutoClicky",
+                style = MaterialTheme.typography.headlineMedium,
+            )
+        }
 
         Text(
             text = if (isServiceConnected) {
@@ -275,9 +289,4 @@ fun AutoClickyScreen(
             Text("About & license")
         }
     }
-}
-
-private fun defaultRecordingName(): String {
-    val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
-    return "Recording " + LocalDateTime.now().format(formatter)
 }
