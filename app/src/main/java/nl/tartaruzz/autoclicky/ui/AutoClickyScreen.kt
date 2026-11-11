@@ -19,8 +19,6 @@
 
 package nl.tartaruzz.autoclicky.ui
 
-import android.graphics.Point
-
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -35,7 +33,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -52,19 +49,19 @@ import com.buzbuz.smartautoclicker.core.dumb.domain.model.DumbScenario
 import kotlinx.coroutines.launch
 
 import nl.tartaruzz.autoclicky.R
-import nl.tartaruzz.autoclicky.engine.DefaultScenarioFactory
 import nl.tartaruzz.autoclicky.engine.EngineController
 import nl.tartaruzz.autoclicky.overlay.QuickPanelController
-import nl.tartaruzz.autoclicky.recording.DumbScenarioBuilder
-import nl.tartaruzz.autoclicky.recording.RecordingController
-import nl.tartaruzz.autoclicky.recording.defaultRecordingName
 
+/**
+ * The main screen: the state of the accessibility service, the floating panel switch and the stored templates.
+ *
+ * Recording itself lives in the floating panel (the REC button), which works above any app: this screen only lists the
+ * templates to rename or delete them.
+ */
 @Composable
 fun AutoClickyScreen(
     engineController: EngineController,
-    recordingController: RecordingController,
     quickPanelController: QuickPanelController,
-    screenCenter: Point,
     onOpenAccessibilitySettings: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -72,46 +69,13 @@ fun AutoClickyScreen(
 
     val scenarios by engineController.scenarios.collectAsState(initial = emptyList())
     val isRunning by engineController.isRunning.collectAsState()
-    val runningScenario by engineController.runningScenario.collectAsState(initial = null)
     val isServiceConnected by engineController.isAccessibilityServiceConnected.collectAsState()
-    val isRecording by recordingController.isRecording.collectAsState()
-    val completedRecording by recordingController.completedRecording.collectAsState()
     val isPanelRequested by quickPanelController.isPanelRequested.collectAsState()
 
-    var recordingName by remember { mutableStateOf("") }
     var renameTarget by remember { mutableStateOf<DumbScenario?>(null) }
     var renameName by remember { mutableStateOf("") }
     var message by remember { mutableStateOf<String?>(null) }
     var showAbout by remember { mutableStateOf(false) }
-
-    LaunchedEffect(completedRecording) {
-        if (completedRecording != null) {
-            recordingName = defaultRecordingName()
-        }
-    }
-
-    val canRecord = isServiceConnected && !isRunning && !isRecording
-
-    if (completedRecording != null) {
-        NameDialog(
-            title = "Save recording",
-            value = recordingName,
-            onValueChange = { newName -> recordingName = newName },
-            confirmLabel = "Save",
-            onConfirm = {
-                val recording = completedRecording ?: return@NameDialog
-                val name = recordingName.trim().ifEmpty { defaultRecordingName() }
-
-                coroutineScope.launch {
-                    engineController.addScenario(DumbScenarioBuilder.build(name, recording.actions))
-                    recordingController.consumeCompletedRecording()
-                }
-            },
-            onDismiss = {
-                recordingController.consumeCompletedRecording()
-            },
-        )
-    }
 
     renameTarget?.let { target ->
         NameDialog(
@@ -121,7 +85,11 @@ fun AutoClickyScreen(
             confirmLabel = "Rename",
             onConfirm = {
                 coroutineScope.launch {
-                    engineController.renameScenario(target, renameName)
+                    try {
+                        engineController.renameScenario(target, renameName)
+                    } catch (e: Exception) {
+                        message = "Cannot rename this template: ${e.message}"
+                    }
                     renameTarget = null
                 }
             },
@@ -174,8 +142,9 @@ fun AutoClickyScreen(
         )
 
         Text(
-            text = "A small REC / STOP / PLAY bar that stays above the other apps: start a recording while you use " +
-                "another app, stop it from there, and replay the last template without coming back here.",
+            text = "A small REC / STOP / PLAY / ×N bar that stays above the other apps: record a macro while you use " +
+                "another app, save it from there, and replay it once or as many times as you want, without coming " +
+                "back here.",
             style = MaterialTheme.typography.bodyMedium,
         )
 
@@ -187,50 +156,13 @@ fun AutoClickyScreen(
         }
 
         Text(
-            text = "Record",
-            style = MaterialTheme.typography.titleLarge,
-        )
-
-        Button(
-            enabled = canRecord,
-            onClick = {
-                if (!recordingController.startTapCapture()) {
-                    message = "Cannot start the recording, is the accessibility service enabled?"
-                }
-            },
-        ) {
-            Text("Record taps (keep using your apps)")
-        }
-
-        Button(
-            enabled = canRecord,
-            onClick = {
-                if (!recordingController.startGestureCapture()) {
-                    message = "Cannot start the recording, is the accessibility service enabled?"
-                }
-            },
-        ) {
-            Text("Record gestures (swipes, long press, multi finger)")
-        }
-
-        if (isRecording) {
-            Text(
-                text = "Recording... tap the \"Stop recording\" button on the screen when you are done.",
-                style = MaterialTheme.typography.bodyMedium,
-            )
-            Button(onClick = { recordingController.stopCapture() }) {
-                Text("Stop recording")
-            }
-        }
-
-        Text(
             text = "Templates",
             style = MaterialTheme.typography.titleLarge,
         )
 
         if (scenarios.isEmpty()) {
             Text(
-                text = "No template yet, record one!",
+                text = "No template yet: press REC on the floating panel to record one.",
                 style = MaterialTheme.typography.bodyMedium,
             )
         }
@@ -238,41 +170,21 @@ fun AutoClickyScreen(
         scenarios.forEach { scenario ->
             ScenarioRow(
                 scenario = scenario,
-                isRunning = runningScenario?.id?.databaseId == scenario.id.databaseId,
                 enabled = !isRunning,
-                onPlay = {
-                    coroutineScope.launch {
-                        if (!engineController.startScenario(scenario.id.databaseId)) {
-                            message = "Cannot play this template, is the accessibility service enabled?"
-                        }
-                    }
-                },
-                onStop = { engineController.stopScenario() },
-                onDuplicate = { engineController.duplicateScenario(scenario) },
                 onRename = {
                     renameName = scenario.name
                     renameTarget = scenario
                 },
                 onDelete = {
-                    coroutineScope.launch { engineController.deleteScenario(scenario) }
+                    coroutineScope.launch {
+                        try {
+                            engineController.deleteScenario(scenario)
+                        } catch (e: Exception) {
+                            message = "Cannot delete this template: ${e.message}"
+                        }
+                    }
                 },
             )
-        }
-
-        TextButton(
-            enabled = isServiceConnected && !isRunning && !isRecording,
-            onClick = {
-                coroutineScope.launch {
-                    val scenarioId = engineController.addScenario(
-                        DefaultScenarioFactory.createSingleClickScenario(screenCenter)
-                    )
-                    if (scenarioId != null) {
-                        engineController.startScenario(scenarioId)
-                    }
-                }
-            },
-        ) {
-            Text("Quick test: click at the screen center")
         }
 
         message?.let { text ->

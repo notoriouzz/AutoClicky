@@ -33,6 +33,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -58,8 +59,16 @@ class EngineController @Inject constructor(
     /** True while a scenario is being played. */
     val isRunning: StateFlow<Boolean> = dumbEngine.isRunning
 
-    /** The scenario currently played, if any. */
-    val runningScenario: Flow<DumbScenario?> = dumbEngine.dumbScenario
+    /**
+     * The scenario currently played, if any.
+     *
+     * The engine keeps the scenario loaded after it stopped, so the running flag is combined in: a stopped scenario is
+     * not "running" anymore, even though it is still the last one that was played.
+     */
+    val runningScenario: Flow<DumbScenario?> =
+        combine(isRunning, dumbEngine.dumbScenario) { running, scenario ->
+            scenario.takeIf { running }
+        }
 
     private val _lastStartedScenarioId = MutableStateFlow<Long?>(null)
 
@@ -203,11 +212,6 @@ class EngineController @Inject constructor(
         if (trimmedName.isEmpty() || trimmedName == scenario.name) return
 
         onDatabase { dumbRepository.updateDumbScenario(scenario.copy(name = trimmedName)) }
-    }
-
-    /** Store a copy of [scenario] under [copyName]. */
-    fun duplicateScenario(scenario: DumbScenario, copyName: String = "${scenario.name} (copy)") {
-        dumbRepository.addDumbScenarioCopy(scenario.id.databaseId, copyName) { /* The scenario flow refreshes itself. */ }
     }
 
     suspend fun deleteScenario(scenario: DumbScenario) {

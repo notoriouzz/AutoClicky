@@ -37,6 +37,8 @@ import androidx.compose.ui.unit.dp
 
 import com.buzbuz.smartautoclicker.core.dumb.domain.model.DumbScenario
 
+import nl.tartaruzz.autoclicky.engine.toRepeatSetting
+
 /** A dialog asking for a template name. */
 @Composable
 fun NameDialog(
@@ -71,19 +73,17 @@ fun NameDialog(
     )
 }
 
-/** One stored template, with its playback and edition actions. */
+/** One stored template: its name, its repeat setting and the edition actions. */
 @Composable
 fun ScenarioRow(
     scenario: DumbScenario,
-    isRunning: Boolean,
     enabled: Boolean,
-    onPlay: () -> Unit,
-    onStop: () -> Unit,
-    onDuplicate: () -> Unit,
     onRename: () -> Unit,
     onDelete: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val repeat = scenario.toRepeatSetting()
+
     Card(modifier = modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier
@@ -96,7 +96,7 @@ fun ScenarioRow(
                 style = MaterialTheme.typography.titleMedium,
             )
             Text(
-                text = "${scenario.dumbActions.size} action(s)",
+                text = "${scenario.dumbActions.size} action(s) · ${repeat.label}",
                 style = MaterialTheme.typography.bodySmall,
             )
 
@@ -105,12 +105,6 @@ fun ScenarioRow(
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                TextButton(onClick = if (isRunning) onStop else onPlay) {
-                    Text(if (isRunning) "Stop" else "Play")
-                }
-                TextButton(onClick = onDuplicate, enabled = enabled) {
-                    Text("Copy")
-                }
                 TextButton(onClick = onRename, enabled = enabled) {
                     Text("Rename")
                 }

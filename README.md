@@ -13,20 +13,19 @@ template library are specific to AutoClicky.
 
 - **Record taps while you keep using your apps** — a pass-through watcher window captures the taps you make on other
   apps, in order, at their real screen coordinates.
-- **Record full gestures** — a dimmed overlay captures taps, long presses, swipes and multi-finger gestures with their
-  real timings.
-- **Floating panel above every app** — a small draggable **REC / STOP / PLAY / LIST / X** bar
-  (`TYPE_ACCESSIBILITY_OVERLAY`) stays on top of the app you are using: start a recording, stop it, save it on the spot,
-  and pick any stored template to replay — all without going back to AutoClicky. It appears on its own while a template
-  is playing.
-- **Save where you are** — as soon as a capture started from the panel ends, a **Save recording** card with a large
-  **SAVE** button opens above the current app; one tap stores it and PLAYS it back when you press play. Renaming can be
-  done in the app afterwards.
-- **Templates** — every recording is stored in a Room database and listed in the app: play / stop, duplicate, rename and
-  delete.
-- **Quick test** — a one-click "click at the screen center" scenario to check that the accessibility service works.
+- **Floating panel above every app** — a small draggable **REC / STOP / PLAY / ×N / LIST / X** bar
+  (`TYPE_ACCESSIBILITY_OVERLAY`) stays on top of the app you are using: record a macro, stop it, save it on the spot, and
+  replay any stored template — all without going back to AutoClicky. It appears on its own while a template is playing.
+- **Save where you are** — as soon as a recording ends, a **Save recording** card opens above the current app: pick how
+  often the macro must repeat, then tap **SAVE**. One tap stores it and **PLAY** replays it.
+- **Repeat** — play a macro once, 3×, 5×, 10×, 50× or endlessly until you press STOP or touch the screen, with a pause
+  between the passes. The choice is stored in the template.
+- **Templates** — every recording is stored in a Room database and listed in the app, where it can be renamed or
+  deleted. The template list is also one tap away on the floating panel.
 - **About & license** — the app shows its GPL-3.0 text and the upstream credits (the license file is bundled in the APK).
 - **No root, no media projection, no overlay permission** — everything runs through a single accessibility service.
+
+Made by **Notoriouzz** — <https://github.com/notoriouzz/AutoClicky>.
 
 ## Relationship with Smart AutoClicker (is this a fork?)
 
@@ -113,21 +112,20 @@ be recorded or replayed.
 1. Install and open AutoClicky.
 2. Tap **Open accessibility settings**, find **AutoClicky** and enable its accessibility service. Without it no gesture
    can be executed and no recording can be captured.
-3. Record:
-   - **Record taps (keep using your apps)** — switch to the app you want to automate, tap the targets in the order you
-     want them replayed, then press the floating **Stop recording** button. Only taps are captured in this mode.
-   - **Record gestures (swipes, long press, multi finger)** — a dimmed overlay covers the screen: draw the gestures on
-     it, then press **Stop recording**. The app underneath cannot be used while this mode is active.
-4. Give the recording a name. It is now a template in the list.
-5. Press **Play** on a template to replay it once (stop it any time with **Stop**).
+3. Tap **Show floating panel**: recording and playing are done from there, above whatever app you are using.
+4. Record: press **REC**, tap the targets in the order they must be replayed, then press **STOP**.
+5. The **Save recording** card opens: choose how often the macro must repeat and the pause between the passes, then
+   press **SAVE**.
+6. Press **PLAY** (or **×N** to change the repeat) to replay it. The templates are listed in the app, where they can be
+   renamed or deleted.
 
 ### Recording and replaying from the floating panel
 
 Tap **Show floating panel** in the main screen (the panel also appears on its own while a template runs). A small
-draggable bar with **REC / STOP / PLAY / LIST / X** then stays above every other app:
+draggable bar with **REC / STOP / PLAY / ×N / LIST / X** then stays above every other app:
 
-1. **REC** — starts a tap recording, exactly like *Record taps*: open any app, tap what you want to replay, then press
-   **STOP** on the panel (or the floating **Stop recording** button).
+1. **REC** — starts a tap recording: open any app, tap what you want to replay, then press **STOP** on the panel (or the
+   floating **Stop recording** button).
 2. The **Save recording** card opens immediately, above the app you are in: tap **SAVE** to store it (the proposed name
    is shown, it can be renamed in the app), or **DISCARD**. No keyboard is needed, so the card never gets stuck behind
    it. The template is stored right away and **PLAY replays it**, without opening AutoClicky.
@@ -191,7 +189,7 @@ GestureRecordingOverlay (full screen MotionEvent capture)─┘                 
 AutoClicky/
 ├── app/                                  AutoClicky application (Compose UI, service, recorder)
 │   └── src/main/java/nl/tartaruzz/autoclicky/
-│       ├── engine/                       EngineController, DefaultScenarioFactory
+│       ├── engine/                       EngineController, RepeatSetting
 │       ├── overlay/                      floating panel, save dialog and template picker (accessibility overlays)
 │       ├── recording/                    recorder overlays + pure recording logic
 │       ├── service/AutoClickService.kt   accessibility service (gesture executor host)
@@ -233,13 +231,14 @@ Dependency flow of the vendored code (`A ──▶ B` means *A depends on B*):
 ## Known limitations
 
 - Live tap recording captures taps only (no duration, movement or extra fingers), a platform limitation.
-- Gesture recording blocks the app underneath while it is active.
+- The tap recorder of the panel is the only recording mode offered by the UI. The gesture recorder (swipes, long press,
+  multi finger) is still in the code (`RecordingController.startGestureCapture`) but has no entry point anymore: a
+  dimmed overlay blocks the app underneath while it records.
 - Idle time between actions is clamped to the engine's maximum delay (1 hour); a single gesture is limited to ~59 s.
 - After a reboot the accessibility service reconnects only once the device has been unlocked for the first time: Android
   ignores accessibility services that are not `directBootAware` while the credential-encrypted storage is locked, and
   AutoClicky cannot opt in because its templates live in the credential-encrypted database.
-- The floating panel only records **taps** (the same platform limitation as *Record taps*); for swipes and multi-finger
-  gestures use *Record gestures* in the activity.
+- The floating panel only records **taps** (a platform limitation of the pass-through watcher).
 - The floating **Save recording** card only offers SAVE / DISCARD with a proposed name; rename the template in the app if
   you want a meaningful name. This is deliberate: an editable field opens the keyboard inside an accessibility overlay,
   which on several devices hides the buttons and leaves the card blocking the screen.

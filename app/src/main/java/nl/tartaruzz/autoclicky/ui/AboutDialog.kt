@@ -72,6 +72,14 @@ fun AboutDialog(onDismiss: () -> Unit) {
                     style = MaterialTheme.typography.titleSmall,
                 )
                 Text(
+                    text = "Made by Notoriouzz.",
+                    style = MaterialTheme.typography.titleSmall,
+                )
+                Text(
+                    text = "https://github.com/notoriouzz/AutoClicky",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                Text(
                     text = "Copyright (C) 2026 AutoClicky contributors.\n" +
                         "Licensed under the GNU General Public License v3.0 or later.",
                     style = MaterialTheme.typography.bodyMedium,

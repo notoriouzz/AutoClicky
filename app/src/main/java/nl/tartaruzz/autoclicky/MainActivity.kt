@@ -20,7 +20,6 @@
 package nl.tartaruzz.autoclicky
 
 import android.content.Intent
-import android.graphics.Point
 import android.os.Bundle
 import android.provider.Settings
 
@@ -36,7 +35,6 @@ import dagger.hilt.android.AndroidEntryPoint
 
 import nl.tartaruzz.autoclicky.engine.EngineController
 import nl.tartaruzz.autoclicky.overlay.QuickPanelController
-import nl.tartaruzz.autoclicky.recording.RecordingController
 import nl.tartaruzz.autoclicky.ui.AutoClickyScreen
 import nl.tartaruzz.autoclicky.ui.theme.AutoClickyTheme
 
@@ -46,34 +44,24 @@ import javax.inject.Inject
 class MainActivity : ComponentActivity() {
 
     @Inject lateinit var engineController: EngineController
-    @Inject lateinit var recordingController: RecordingController
     @Inject lateinit var quickPanelController: QuickPanelController
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        val screenCenter = getScreenCenter()
-
         setContent {
             AutoClickyTheme {
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
                     AutoClickyScreen(
                         engineController = engineController,
-                        recordingController = recordingController,
                         quickPanelController = quickPanelController,
-                        screenCenter = screenCenter,
                         onOpenAccessibilitySettings = ::openAccessibilitySettings,
                         modifier = Modifier.padding(innerPadding),
                     )
                 }
             }
         }
-    }
-
-    private fun getScreenCenter(): Point {
-        val bounds = windowManager.currentWindowMetrics.bounds
-        return Point(bounds.centerX(), bounds.centerY())
     }
 
     private fun openAccessibilitySettings() {
