@@ -33,10 +33,10 @@ Made by **Notoriouzz** — <https://github.com/notoriouzz/AutoClicky>.
 
 ## Support
 
-AutoClicky is free, without ads and without tracking. If it saves you some time, you can buy me a coffee: it pays for
-the test phones and for the coffee that keeps the code flowing.
+AutoClicky is free — no ads, no subscription, no tracking. If it saves you a few taps a day, treat me to a coffee:
+donations start at **€1**, and every cup is 0% code but 100% motivation. ☕
 
-☕ <https://ko-fi.com/tartaruzz>
+<https://ko-fi.com/tartaruzz>
 
 ## Relationship with Smart AutoClicker (is this a fork?)
 
@@ -136,10 +136,10 @@ Tap **Show floating panel** in the main screen (the panel also appears on its ow
 draggable bar with **REC / STOP / PLAY / ×N / LIST / X** then stays above every other app:
 
 1. **REC** — starts a **tap** recording: open any app, tap what you want to replay, then press **STOP** on the panel (or
-   the floating **Stop recording** button). A red banner at the top of the screen says *Recording TAPS* while it runs.
+   the floating **Stop** button). A red dot starts blinking in the top corner while it records.
 2. **Hold REC** (~0,5 s) — starts a **gesture** recording instead: the screen dims and you draw the gestures (swipes,
-   long press, multi finger) the template must replay, then press **STOP**. The banner says *Recording GESTURES*, and the
-   app underneath cannot be used while this mode is active (the overlay swallows the touches).
+   long press, multi finger) the template must replay, then press **STOP**. The red dot blinks here too, and the app
+   underneath cannot be used while this mode is active (the overlay swallows the touches).
 3. The **Save recording** card opens immediately, above the app you are in: it shows what was captured (*12 taps* or
    *3 gestures*) and a large **SAVE** / **DISCARD**. No keyboard is needed, so the card never gets stuck behind it. The
    template is stored right away and **PLAY replays it**, without opening AutoClicky. A new template plays **once**; set
@@ -162,7 +162,7 @@ set at least `0.5 s`/`1 s` when the template ends on a button of a calculator or
 **STOP** stops a recording or a running template, **X** hides the panel for the current run. While a template runs, the
 panel stays visible (with the running template's name in the list) so it can be stopped from any app.
 
-The panel is hidden while a capture overlay is active (both recording modes already show their own **Stop recording**
+The panel is hidden while a capture overlay is active (both recording modes already show their own **Stop**
 button) and comes back as soon as the capture ends.
 
 ## How the recording works

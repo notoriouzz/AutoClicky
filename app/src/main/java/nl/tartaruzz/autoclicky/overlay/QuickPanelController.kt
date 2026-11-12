@@ -27,6 +27,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -80,6 +81,7 @@ class QuickPanelController @Inject constructor(
 
     private var stateJob: Job? = null
     private var completedRecordingJob: Job? = null
+    private var saveRetryJob: Job? = null
 
     private var isVisibleRequested = false
     private var isDismissedForCurrentRun = false
@@ -138,6 +140,8 @@ class QuickPanelController @Inject constructor(
         stateJob = null
         completedRecordingJob?.cancel()
         completedRecordingJob = null
+        saveRetryJob?.cancel()
+        saveRetryJob = null
 
         saveOverlay?.dismiss()
         saveOverlay = null
@@ -158,6 +162,22 @@ class QuickPanelController @Inject constructor(
     /** Show the panel when it is hidden, hide it when it is displayed. */
     fun toggle() {
         setPanelRequested(!isVisibleRequested)
+    }
+
+    /**
+     * Called by the accessibility service when the screen is rotated.
+     *
+     * The panel keeps its absolute position across a rotation, so it can end up outside the screen; and a card that was
+     * being attached at that moment may have been refused by the window manager. Both are fixed here: the panel goes
+     * back to a visible place, and a recording that is still waiting to be saved is offered again.
+     */
+    fun onConfigurationChanged() {
+        overlay?.onScreenRotated()
+
+        val pendingRecording = recordingController.completedRecording.value
+        if (pendingRecording != null && saveOverlay == null) {
+            showSaveOverlay(pendingRecording)
+        }
     }
 
     /** Pin or unpin the panel to the screen, from the activity. */
@@ -382,10 +402,33 @@ class QuickPanelController @Inject constructor(
 
     /** Offer the recording that was just captured, above the app the user is in. */
     private fun showSaveOverlay(recording: CompletedRecording) {
-        val service = service ?: return
+        if (attachSaveOverlay(recording)) return
+
+        showMessage("Cannot display the save dialog now, retrying")
+
+        // Adding a window can be refused while the display is rotating: keep trying for a moment, the recording is
+        // still pending (it is only consumed when it is saved).
+        saveRetryJob?.cancel()
+        saveRetryJob = scope.launch {
+            repeat(SAVE_OVERLAY_RETRY_COUNT) {
+                delay(SAVE_OVERLAY_RETRY_DELAY_MS)
+                if (attachSaveOverlay(recording)) return@launch
+            }
+        }
+    }
+
+    /**
+     * Build and attach the save card.
+     *
+     * @return false when the card is not displayed, for instance because the window manager refused the window during a
+     * rotation.
+     */
+    private fun attachSaveOverlay(recording: CompletedRecording): Boolean {
+        if (saveOverlay != null) return true
+
+        val service = service ?: return false
 
         offeredRecording = recording
-        saveOverlay?.dismiss()
 
         val overlay = SaveRecordingOverlay(
             service = service,
@@ -402,10 +445,11 @@ class QuickPanelController @Inject constructor(
 
         if (!overlay.show()) {
             saveOverlay = null
-            showMessage("Cannot display the save dialog, open AutoClicky to save the recording")
+            return false
         }
 
         applyState()
+        return true
     }
 
     private fun saveRecording(recording: CompletedRecording) {
@@ -464,5 +508,9 @@ class QuickPanelController @Inject constructor(
 
     private companion object {
         const val TAG = "QuickPanelController"
+
+        /** How often the save card is retried when the window manager refuses it, and how long between two tries. */
+        const val SAVE_OVERLAY_RETRY_COUNT = 6
+        const val SAVE_OVERLAY_RETRY_DELAY_MS = 300L
     }
 }

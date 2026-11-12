@@ -21,6 +21,7 @@ package nl.tartaruzz.autoclicky.service
 
 import android.accessibilityservice.AccessibilityService
 import android.content.Intent
+import android.content.res.Configuration
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
 
@@ -74,6 +75,13 @@ class AutoClickService : AccessibilityService() {
         if (safeEvent.packageName == packageName) return
 
         recordingController.onViewClicked(safeEvent)
+    }
+
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+
+        Log.i(TAG, "Configuration changed: ${newConfig.orientation}, putting the overlays back in place")
+        quickPanelController.onConfigurationChanged()
     }
 
     override fun onInterrupt() = Unit

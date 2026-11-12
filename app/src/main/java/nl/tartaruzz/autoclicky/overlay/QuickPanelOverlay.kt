@@ -65,6 +65,9 @@ class QuickPanelOverlay(
     private var panelParams: WindowManager.LayoutParams? = null
     private var isPositioned = false
 
+    /** True once the user dragged the panel: the default corner is not applied anymore, the position is only clamped. */
+    private var isUserMoved = false
+
     private var recordButton: TextView? = null
     private var stopButton: TextView? = null
     private var playButton: TextView? = null
@@ -109,6 +112,7 @@ class QuickPanelOverlay(
         panelView = null
         panelParams = null
         isPositioned = false
+        isUserMoved = false
         recordButton = null
         stopButton = null
         playButton = null
@@ -140,6 +144,34 @@ class QuickPanelOverlay(
     /** Show the number of passes currently chosen on the repeat button. */
     fun setRepeatLabel(label: String) {
         repeatButton?.text = label
+    }
+
+    /**
+     * Put the panel back in a visible place after the screen rotated.
+     *
+     * A window keeps its absolute x/y across a rotation: a panel pinned to the right edge in landscape ends up outside
+     * the portrait screen and cannot be touched anymore. The default corner is therefore recomputed, and a panel the
+     * user dragged is only clamped inside the new screen.
+     */
+    fun onScreenRotated() {
+        val panel = panelView ?: return
+        val params = panelParams ?: return
+        val windowManager = windowManager ?: return
+
+        if (isUserMoved) {
+            val metrics = service.resources.displayMetrics
+            params.x = params.x.coerceIn(0, (metrics.widthPixels - panel.width).coerceAtLeast(0))
+            params.y = params.y.coerceIn(0, (metrics.heightPixels - panel.height).coerceAtLeast(0))
+
+            try {
+                windowManager.updateViewLayout(panel, params)
+            } catch (_: IllegalArgumentException) {
+                // The panel was removed in the meantime.
+            }
+        } else {
+            isPositioned = false
+            positionPanelIfNeeded(panel)
+        }
     }
 
     @SuppressLint("ClickableViewAccessibility") // Every button handles its own touch events, see DragTouchListener.
@@ -348,6 +380,7 @@ class QuickPanelOverlay(
             params.x = x
             params.y = y
             isPositioned = true
+            isUserMoved = true
 
             try {
                 windowManager.updateViewLayout(panel, params)

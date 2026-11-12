@@ -45,10 +45,7 @@ class GestureRecordingOverlay(
     private var captureView: View? = null
     private var stopButton: Button? = null
 
-    private val badge = RecordingBadge(
-        service = service,
-        label = "● Recording GESTURES\ndraw on the screen, then tap STOP",
-    )
+    private val indicator = RecordingIndicator(service = service)
 
     fun start() {
         val windowManager = windowManager ?: return
@@ -71,7 +68,7 @@ class GestureRecordingOverlay(
 
         if (stopButton == null) {
             val button = Button(service).apply {
-                text = "Stop recording"
+                text = "Stop"
                 setOnClickListener { onStopRequested() }
             }
 
@@ -80,11 +77,11 @@ class GestureRecordingOverlay(
             }
         }
 
-        badge.show()
+        indicator.show()
     }
 
     fun stop() {
-        badge.hide()
+        indicator.hide()
 
         val windowManager = windowManager ?: return
 

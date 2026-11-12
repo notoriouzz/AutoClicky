@@ -50,15 +50,12 @@ class TapRecordingOverlay(
     private var watcherView: View? = null
     private var stopButton: Button? = null
 
-    private val badge = RecordingBadge(
-        service = service,
-        label = "● Recording TAPS\ntap STOP when you are done",
-    )
+    private val indicator = RecordingIndicator(service = service)
 
     fun start() {
         val windowManager = windowManager ?: return
 
-        badge.show()
+        indicator.show()
 
         if (watcherView == null) {
             @SuppressLint("ClickableViewAccessibility") // The view only receives the touches made outside of it.
@@ -78,7 +75,7 @@ class TapRecordingOverlay(
 
         if (stopButton == null) {
             val button = Button(service).apply {
-                text = "Stop recording"
+                text = "Stop"
                 setOnClickListener { onStopRequested() }
             }
 
@@ -89,7 +86,7 @@ class TapRecordingOverlay(
     }
 
     fun stop() {
-        badge.hide()
+        indicator.hide()
 
         val windowManager = windowManager ?: return
 

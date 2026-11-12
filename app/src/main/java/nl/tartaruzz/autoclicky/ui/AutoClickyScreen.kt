@@ -195,8 +195,8 @@ fun AutoClickyScreen(
         )
 
         Text(
-            text = "AutoClicky is free, without ads and without tracking. If it saves you some time, you can buy me a " +
-                "coffee: it pays for the test phones and for the coffee that keeps the code flowing.",
+            text = "AutoClicky is free — no ads, no subscription, no tracking. If it saves you a few taps a day, treat " +
+                "me to a coffee: donations start at €1, and every cup is 0% code but 100% motivation. ☕",
             style = MaterialTheme.typography.bodyMedium,
         )
 

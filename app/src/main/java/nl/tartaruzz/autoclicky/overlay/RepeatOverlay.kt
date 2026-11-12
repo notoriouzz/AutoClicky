@@ -117,7 +117,10 @@ class RepeatOverlay(
             setPadding(toPx(20), toPx(18), toPx(20), toPx(18))
             background = roundedBackground(CARD_COLOR, 20)
             layoutParams = FrameLayout.LayoutParams(
-                (service.resources.displayMetrics.widthPixels * CARD_WIDTH_RATIO).toInt(),
+                minOf(
+                    (service.resources.displayMetrics.widthPixels * CARD_WIDTH_RATIO).toInt(),
+                    toPx(CARD_MAX_WIDTH_DP),
+                ),
                 FrameLayout.LayoutParams.WRAP_CONTENT,
             ).apply {
                 gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
@@ -272,6 +275,9 @@ class RepeatOverlay(
         val LOOP_DELAY_LABELS: List<String> = listOf("0s", "0.5s", "1s", "3s", "10s")
 
         const val CARD_WIDTH_RATIO = 0.9f
+
+        /** The card keeps a readable width in landscape, where 90% of the screen would be far too wide. */
+        const val CARD_MAX_WIDTH_DP = 560
         const val CARD_BOTTOM_MARGIN_DP = 56
         const val BUTTON_HEIGHT_DP = 52
         const val BUTTON_SPACING_DP = 12

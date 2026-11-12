@@ -49,7 +49,7 @@ capture, because Android gives an app two very different views of the screen:
 | The app you are in | stays **usable**: you tap normally | is **blocked**: the screen dims |
 | What is recorded | the position of each tap and its order | the full path, duration and number of fingers |
 | Typical use | menus, forms, buttons, "press 1+1=" | swipes, scrolling, long press, pinch/zoom, multi finger |
-| Banner while recording | **● Recording TAPS** | **● Recording GESTURES** |
+| Marker while recording | a small **blinking red dot** in the top corner | the same dot, on a dimmed screen |
 
 **Why the difference?** In tap mode AutoClicky does not take the touches: it lets them go to the app (so you can keep
 using it) and only observes where they landed. Android then reports a position and a moment, nothing more — a swipe or a
@@ -59,9 +59,9 @@ gets every movement, but the app underneath cannot receive them anymore.
 ### Record taps
 
 1. Open the app you want to automate.
-2. Tap **REC** (short press). A red banner says **● Recording TAPS**, and a **Stop recording** button appears.
+2. Tap **REC** (short press). A small **red dot blinks** in the top corner and a **Stop** button appears.
 3. Tap what you want to replay, in the right order — the app works as usual.
-4. Press **STOP** (panel) or **Stop recording**.
+4. Press **STOP** (panel) or **Stop**.
 5. The **Save recording** card opens: press **SAVE**.
 
 Taps are stored at the centre of the tapped button, which is more reliable than the raw finger position: it is what
@@ -70,12 +70,16 @@ makes the recording survive small finger placement differences.
 ### Record gestures
 
 1. Tap **REC** and **keep the finger on the button for about half a second**. You feel a short vibration.
-2. The screen dims and the banner says **● Recording GESTURES**.
+2. The screen dims and the red dot starts blinking.
 3. Draw the gestures on the screen: swipe, hold, pinch… Each gesture is stored in order with its duration.
-4. Press **STOP** (panel) or **Stop recording**.
+4. Press **STOP** (panel) or **Stop**.
 5. Press **SAVE** on the card.
 
 While gesture mode is active the app underneath is frozen: you are *describing* the gesture, not performing it.
+
+Both modes work in **portrait and landscape**. The panel, the blinking dot and the **Stop** button are placed with a
+gravity (a corner, the bottom centre) instead of fixed coordinates, so they follow the rotation; the **Save recording**
+card is offered again if the screen was rotating while it opened.
 
 ## 4. Saving a recording
 
@@ -153,10 +157,10 @@ Playing and repeating are done from the floating panel, so the app stays a simpl
 
 ## 10. Support
 
-AutoClicky is free, without ads and without tracking. If it saves you some time, you can buy me a coffee — it pays for
-the test phones and for the coffee that keeps the code flowing:
+AutoClicky is free — no ads, no subscription, no tracking. If it saves you a few taps a day, treat me to a coffee:
+donations start at **€1**, and every cup is 0% code but 100% motivation. ☕
 
-☕ <https://ko-fi.com/tartaruzz>
+<https://ko-fi.com/tartaruzz>
 
 Licensed under the GNU GPL v3.0 or later — see [`LICENSE`](LICENSE). The clicking engine comes from Smart AutoClicker
 (Klick'r) by Kevin Buzeau and contributors, also GPL-3.0-or-later; see [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
