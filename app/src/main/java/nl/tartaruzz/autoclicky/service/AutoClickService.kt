@@ -30,6 +30,7 @@ import com.buzbuz.smartautoclicker.core.common.actions.AndroidActionExecutor
 import dagger.hilt.android.AndroidEntryPoint
 
 import nl.tartaruzz.autoclicky.engine.EngineController
+import nl.tartaruzz.autoclicky.overlay.PlaybackBorderController
 import nl.tartaruzz.autoclicky.overlay.QuickPanelController
 import nl.tartaruzz.autoclicky.overlay.TouchStopController
 import nl.tartaruzz.autoclicky.recording.RecordingController
@@ -52,6 +53,7 @@ class AutoClickService : AccessibilityService() {
     @Inject lateinit var recordingController: RecordingController
     @Inject lateinit var quickPanelController: QuickPanelController
     @Inject lateinit var touchStopController: TouchStopController
+    @Inject lateinit var playbackBorderController: PlaybackBorderController
 
     override fun onServiceConnected() {
         super.onServiceConnected()
@@ -61,6 +63,7 @@ class AutoClickService : AccessibilityService() {
         recordingController.attach(this)
         quickPanelController.attach(this)
         touchStopController.attach(this)
+        playbackBorderController.attach(this)
         engineController.onAccessibilityServiceConnected()
 
         Log.i(TAG, "Accessibility service ready")
@@ -69,7 +72,12 @@ class AutoClickService : AccessibilityService() {
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         val safeEvent = event ?: return
 
-        if (safeEvent.eventType != AccessibilityEvent.TYPE_VIEW_CLICKED) return
+        // Clicks place the taps the pass-through watcher cannot place, long clicks tell a press was a long one.
+        if (safeEvent.eventType != AccessibilityEvent.TYPE_VIEW_CLICKED &&
+            safeEvent.eventType != AccessibilityEvent.TYPE_VIEW_LONG_CLICKED
+        ) {
+            return
+        }
 
         // The panel and the overlays are part of AutoClicky: their own clicks must never be recorded.
         if (safeEvent.packageName == packageName) return
@@ -90,6 +98,7 @@ class AutoClickService : AccessibilityService() {
         Log.i(TAG, "Accessibility service unbound")
 
         touchStopController.detach()
+        playbackBorderController.detach()
         quickPanelController.detach()
         recordingController.detach()
         engineController.onAccessibilityServiceDisconnected()

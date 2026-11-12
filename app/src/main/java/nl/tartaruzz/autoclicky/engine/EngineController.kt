@@ -57,11 +57,17 @@ class EngineController @Inject constructor(
     /**
      * All the scenarios stored in the database, the most recent first.
      *
-     * The database returns them by name; the id is the insertion order, so sorting on it keeps the template that was
-     * just recorded on top of the list, in the app and in the panel's picker.
+     * They are ordered by their creation date: the id alone would do for recordings made by this version of the app
+     * (it is an autoincrement value), but the creation date is the explicit, reliable order requested for the storage
+     * management and keeps working whatever made a scenario older than another.
      */
     val scenarios: Flow<List<DumbScenario>> = dumbRepository.dumbScenarios
-        .map { storedScenarios -> storedScenarios.sortedByDescending { scenario -> scenario.id.databaseId } }
+        .map { storedScenarios ->
+            storedScenarios.sortedWith(
+                compareByDescending<DumbScenario> { scenario -> scenario.createdAtMs }
+                    .thenByDescending { scenario -> scenario.id.databaseId }
+            )
+        }
 
     /** True while a scenario is being played. */
     val isRunning: StateFlow<Boolean> = dumbEngine.isRunning
@@ -135,15 +141,17 @@ class EngineController @Inject constructor(
     private suspend fun <T> onDatabase(block: suspend () -> T): T = withContext(Dispatchers.IO) { block() }
 
     /**
-     * Persist a new scenario.
+     * Persist a new scenario, stamped with the current time and protected by the storage limit.
      *
      * @return the database id of the inserted scenario, or null if it could not be found after the insertion.
      */
     suspend fun addScenario(scenario: DumbScenario): Long? {
+        val scenarioToStore = scenario.copy(createdAtMs = System.currentTimeMillis())
+
         val newScenarioId = onDatabase {
             val knownIds = dumbRepository.dumbScenarios.first().map { it.id.databaseId }.toSet()
 
-            dumbRepository.addDumbScenario(scenario)
+            dumbRepository.addDumbScenario(scenarioToStore)
 
             dumbRepository.dumbScenarios.first()
                 .firstOrNull { storedScenario -> storedScenario.id.databaseId !in knownIds }
@@ -152,6 +160,9 @@ class EngineController @Inject constructor(
 
         // The PLAY button of the floating panel must replay the recording that was just saved.
         if (newScenarioId != null) _lastStartedScenarioId.value = newScenarioId
+
+        // A sixth unpinned recording replaces the oldest one, unless it is the one about to be played.
+        enforceUnpinnedLimit()
 
         return newScenarioId
     }
@@ -226,6 +237,46 @@ class EngineController @Inject constructor(
 
         onDatabase { dumbRepository.deleteDumbScenario(scenario) }
     }
+
+    /**
+     * Pin a recording, or unpin it.
+     *
+     * A pinned recording is never removed by [enforceUnpinnedLimit]. Unpinning runs that check right away, so a
+     * recording that stayed pinned for a long time may be removed on the spot when it is older than the five newest
+     * unpinned ones.
+     */
+    suspend fun setScenarioPinned(scenario: DumbScenario, pinned: Boolean) {
+        if (scenario.pinned == pinned) return
+
+        onDatabase { dumbRepository.updateDumbScenario(scenario.copy(pinned = pinned)) }
+
+        if (!pinned) enforceUnpinnedLimit()
+    }
+
+    /**
+     * Keep at most [MAX_UNPINNED_SCENARIOS] unpinned recordings, the newest ones.
+     *
+     * Runs when a recording is saved and when one is unpinned, so the limit always holds. Pinned recordings and the
+     * recording currently selected for playback are never removed by this check.
+     */
+    private suspend fun enforceUnpinnedLimit() {
+        val protectedId = _lastStartedScenarioId.value
+
+        onDatabase {
+            val scenarios = dumbRepository.dumbScenarios.first()
+            val overflow = scenarios
+                .filter { scenario -> !scenario.pinned }
+                .sortedWith(compareByDescending<DumbScenario> { it.createdAtMs }.thenByDescending { it.id.databaseId })
+                .drop(MAX_UNPINNED_SCENARIOS)
+
+            overflow.forEach { scenario ->
+                if (scenario.id.databaseId != protectedId) {
+                    Log.i(TAG, "Removing the old unpinned recording ${scenario.name}")
+                    dumbRepository.deleteDumbScenario(scenario)
+                }
+            }
+        }
+    }
 }
 
 /**
@@ -259,3 +310,6 @@ private fun DumbAction.withRepeatDelay(delayMs: Long): DumbAction = when (this) 
 }
 
 private const val TAG = "EngineController"
+
+/** At most this many recordings stay stored without being pinned. */
+const val MAX_UNPINNED_SCENARIOS = 5

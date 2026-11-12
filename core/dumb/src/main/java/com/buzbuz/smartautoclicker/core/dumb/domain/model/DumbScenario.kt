@@ -29,6 +29,13 @@ data class DumbScenario(
     val maxDurationMin: Int,
     val isDurationInfinite: Boolean,
     val randomize: Boolean,
+    /**
+     * True while the user pinned the recording, so it is protected from the automatic cleanup of the unpinned
+     * recordings (which keeps at most five of them).
+     */
+    val pinned: Boolean = false,
+    /** When the recording was created, in epoch milliseconds. Used to order the recordings by their actual date. */
+    val createdAtMs: Long = 0L,
     val stats: ScenarioStats? = null,
 ) : Identifiable, Repeatable {
 

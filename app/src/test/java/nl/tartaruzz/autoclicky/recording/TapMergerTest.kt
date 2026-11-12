@@ -115,4 +115,81 @@ class TapMergerTest {
         assertEquals(1_000L, taps.first().startTimeMs)
         assertEquals(5_000L, taps.last().startTimeMs)
     }
+
+    @Test
+    fun thePressLastsFromTheTouchToTheClick() {
+        val taps = TapMerger.merge(
+            touches = listOf(RecordedTouch(0f, 0f, 1_000L)),
+            clicks = listOf(RecordedViewClick(left = 20, top = 1900, right = 286, bottom = 1968, timeMs = 1_250)),
+        )
+
+        assertEquals(1_000L, taps.first().startTimeMs)
+        assertEquals(1_250L, taps.first().endTimeMs)
+    }
+
+    @Test
+    fun aPressReportedAsAClickStaysATap() {
+        // A click that arrives late must not turn into a long press: 380 ms are stored as the longest tap press.
+        val taps = TapMerger.merge(
+            touches = listOf(RecordedTouch(0f, 0f, 1_000L)),
+            clicks = listOf(RecordedViewClick(left = 20, top = 1900, right = 286, bottom = 1968, timeMs = 1_380)),
+        )
+
+        assertEquals(300L, taps.first().durationMs)
+    }
+
+    @Test
+    fun aLongClickIsReplayedAsALongPress() {
+        val taps = TapMerger.merge(
+            touches = listOf(RecordedTouch(0f, 0f, 1_000L)),
+            clicks = listOf(
+                RecordedViewClick(
+                    left = 20,
+                    top = 1900,
+                    right = 286,
+                    bottom = 1968,
+                    timeMs = 1_500,
+                    isLongPress = true,
+                )
+            ),
+        )
+
+        assertEquals(1, taps.size)
+        assertEquals(1_000L, taps.first().startTimeMs)
+        assertEquals(700L, taps.first().durationMs)
+    }
+
+    @Test
+    fun aLongPressReportedAsClickAndLongClickIsASingleTap() {
+        val clicks = listOf(
+            RecordedViewClick(
+                left = 20,
+                top = 1900,
+                right = 286,
+                bottom = 1968,
+                timeMs = 1_500,
+                isLongPress = true,
+            ),
+            RecordedViewClick(left = 20, top = 1900, right = 286, bottom = 1968, timeMs = 2_100),
+        )
+
+        val taps = TapMerger.merge(listOf(RecordedTouch(0f, 0f, 1_000L)), clicks)
+
+        assertEquals(1, taps.size)
+        assertEquals(1_000L, taps.first().startTimeMs)
+        // The long press is the one kept: it tells the press must be replayed as such.
+        assertEquals(700L, taps.first().durationMs)
+    }
+
+    @Test
+    fun twoTapsOnTheSameViewAreBothKept() {
+        val clicks = listOf(
+            RecordedViewClick(left = 20, top = 1900, right = 286, bottom = 1968, timeMs = 1_000),
+            RecordedViewClick(left = 20, top = 1900, right = 286, bottom = 1968, timeMs = 1_600),
+        )
+
+        val taps = TapMerger.merge(emptyList(), clicks)
+
+        assertEquals(2, taps.size)
+    }
 }

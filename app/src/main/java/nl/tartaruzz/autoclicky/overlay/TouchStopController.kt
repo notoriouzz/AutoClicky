@@ -21,6 +21,10 @@ package nl.tartaruzz.autoclicky.overlay
 
 import android.accessibilityservice.AccessibilityService
 import android.annotation.SuppressLint
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.graphics.PixelFormat
 import android.os.Handler
 import android.os.Looper
@@ -34,7 +38,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 
 import nl.tartaruzz.autoclicky.engine.EngineController
@@ -43,11 +46,10 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Stops a template that repeats endlessly as soon as the user touches the screen.
+ * Stops a playing template as soon as the user touches the screen.
  *
- * The engine repeats a scenario until something stops it, and an infinite template has no timeout by design. The panel
- * offers a STOP button, but it is not always reachable: the user may have hidden the panel, or be in an app that draws
- * over it. Touching the screen is therefore the natural second way to say stop.
+ * Touching the screen is the natural way to interrupt a playback: the panel's STOP button is not always reachable, the
+ * user may have hidden the panel or be in an app that draws over it. Unlike the panel, a touch can land anywhere.
  *
  * The touch is observed with the same technique as the recorder: a one pixel, non touchable window flagged with
  * `FLAG_WATCH_OUTSIDE_TOUCH` receives an `ACTION_OUTSIDE` event for every gesture made outside of it, while the app
@@ -56,8 +58,9 @@ import javax.inject.Singleton
  * - the touches on the AutoClicky windows (panel and cards), which the system does not report to a window of the same
  *   app, so pressing a panel button never stops the run by itself.
  *
- * The watcher only exists while an infinite template is playing, and the gestures already in progress when it starts are
- * not reported: pressing PLAY does not stop its own run.
+ * The screen turning off also stops the playback: it is observed through a receiver on `ACTION_SCREEN_OFF`, which covers
+ * a power press that switches the screen off and the automatic lock. The other physical buttons (volume, power while
+ * the screen stays on) are not visible to an accessibility service, see the documentation.
  */
 @Singleton
 class TouchStopController @Inject constructor(
@@ -70,6 +73,7 @@ class TouchStopController @Inject constructor(
     private var service: AccessibilityService? = null
     private var windowManager: WindowManager? = null
     private var watcherView: View? = null
+    private var screenOffReceiver: BroadcastReceiver? = null
     private var observerJob: Job? = null
 
     fun attach(service: AccessibilityService) {
@@ -89,13 +93,9 @@ class TouchStopController @Inject constructor(
     private fun observeEngine() {
         observerJob?.cancel()
         observerJob = scope.launch {
-            combine(
-                engineController.isRunning,
-                engineController.isInfiniteRunActive,
-            ) { isRunning, isInfinite -> isRunning && isInfinite }
-                .collect { shouldWatch ->
-                    if (shouldWatch) startWatching() else stopWatching()
-                }
+            engineController.isRunning.collect { isRunning ->
+                if (isRunning) startWatching() else stopWatching()
+            }
         }
     }
 
@@ -118,10 +118,31 @@ class TouchStopController @Inject constructor(
         }
 
         watcherView = view
+
+        if (screenOffReceiver == null) {
+            val receiver = object : BroadcastReceiver() {
+                override fun onReceive(context: Context?, intent: Intent?) {
+                    Log.d(TAG, "Screen turned off, stopping the running template")
+                    engineController.stopScenario()
+                }
+            }
+            service.registerReceiver(receiver, IntentFilter(Intent.ACTION_SCREEN_OFF), Context.RECEIVER_EXPORTED)
+            screenOffReceiver = receiver
+        }
+
         Log.d(TAG, "Watching for a user touch to stop the running template")
     }
 
     private fun stopWatching(): Unit = runOnMainThread {
+        screenOffReceiver?.let { receiver ->
+            screenOffReceiver = null
+            try {
+                service?.unregisterReceiver(receiver)
+            } catch (_: IllegalArgumentException) {
+                // The receiver was already unregistered.
+            }
+        }
+
         val view = watcherView ?: return@runOnMainThread
         watcherView = null
 

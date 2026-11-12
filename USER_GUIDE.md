@@ -27,7 +27,7 @@ every other app. This guide explains the two recording modes, how to save a macr
 | Button | What it does |
 |---|---|
 | **REC** | **Tap** = record taps. **Hold ~0,5 s** = record gestures (see §3). |
-| **STOP** | Stops the recording that is running, or the macro that is playing. |
+| **STOP** | Stops the macro that is playing. A recording is stopped with the **✕** under the red dot. |
 | **PLAY** | Plays the template that was played last (the most recent one when nothing was played yet). |
 | **×N** | Opens the **Repeat** card: how many times to play the template and how long to wait between two passes (§6). |
 | **≡** | Opens the template list, to pick another template and play it. |
@@ -36,33 +36,42 @@ every other app. This guide explains the two recording modes, how to save a macr
 The panel can be **dragged** with any of its buttons: hold a button and move the finger. A short press on that same
 button clicks it; holding it still triggers the alternative action of REC (gesture recording).
 
-The panel hides itself while you record and while a card (save, repeat, template list) is open — that is normal: those
-windows are full screen and need the taps.
+The panel hides itself while you record and while a card (repeat, template list) is open — that is normal: those windows
+are full screen and need the taps.
 
 ## 3. Recording: taps or gestures?
 
 Both modes store the **same kind of template**, and both replay the same way. They only differ in what they are able to
 capture, because Android gives an app two very different views of the screen:
 
-| | **Tap REC** — taps | **Hold REC** — gestures |
-|---|---|---|
+| | | **Tap REC** — taps | **Hold REC** — gestures |
+|---|---|---|---|
 | The app you are in | stays **usable**: you tap normally | is **blocked**: the screen dims |
 | What is recorded | the position of each tap and its order | the full path, duration and number of fingers |
 | Typical use | menus, forms, buttons, "press 1+1=" | swipes, scrolling, long press, pinch/zoom, multi finger |
-| Marker while recording | a small **blinking red dot** in the top corner | the same dot, on a dimmed screen |
+| Marker while recording | a small **blinking red dot** in the top corner, **amber** once the touches are forwarded | the same dot, on a dimmed screen |
 
-**Why the difference?** In tap mode AutoClicky does not take the touches: it lets them go to the app (so you can keep
-using it) and only observes where they landed. Android then reports a position and a moment, nothing more — a swipe or a
-long press cannot be reconstructed from that. In gesture mode AutoClicky takes the touches on a dimmed overlay, so it
-gets every movement, but the app underneath cannot receive them anymore.
+**Why the difference?** Android gives only two ways to see what a finger does, and neither is free:
+
+- *Tap mode* lets the touches go to the app and only observes them from the outside. Nothing is delayed, but Android
+  then reports a position and a moment, nothing more — and some devices report no position at all, while an app that
+  draws its own interface (a game, a video) reports nothing either.
+- *Gesture mode* takes the touches on a dimmed overlay, so it gets every movement, but the app underneath cannot receive
+  them anymore.
+
+Tap mode therefore **switches automatically when it has to**: as soon as AutoClicky notices that the app does not tell
+where you tapped — a game for instance — it keeps the app usable by receiving the touches and sending them back to it.
+The dot turns **amber** (and a message says so when the system allows it) when that happens. The app then reacts when
+you release your finger instead of while you press, and **long presses and swipes are recorded too**. This is the only
+technique Android offers without root: no app can both watch your finger and let the touch through on a screen it draws
+itself.
 
 ### Record taps
 
 1. Open the app you want to automate.
-2. Tap **REC** (short press). A small **red dot blinks** in the top corner and a **Stop** button appears.
+2. Tap **REC** (short press). A small **red dot blinks** in the top corner, with an **✕** right under it.
 3. Tap what you want to replay, in the right order — the app works as usual.
-4. Press **STOP** (panel) or **Stop**.
-5. The **Save recording** card opens: press **SAVE**.
+4. Tap the **✕** under the dot. The recording is saved on the spot (**Recording saved**) and **PLAY** will replay it.
 
 Taps are stored at the centre of the tapped button, which is more reliable than the raw finger position: it is what
 makes the recording survive small finger placement differences.
@@ -72,31 +81,30 @@ makes the recording survive small finger placement differences.
 1. Tap **REC** and **keep the finger on the button for about half a second**. You feel a short vibration.
 2. The screen dims and the red dot starts blinking.
 3. Draw the gestures on the screen: swipe, hold, pinch… Each gesture is stored in order with its duration.
-4. Press **STOP** (panel) or **Stop**.
-5. Press **SAVE** on the card.
+4. Tap the **✕** under the dot. The recording is saved on the spot.
 
 While gesture mode is active the app underneath is frozen: you are *describing* the gesture, not performing it.
 
-Both modes work in **portrait and landscape**. The panel, the blinking dot and the **Stop** button are placed with a
-gravity (a corner, the bottom centre) instead of fixed coordinates, so they follow the rotation; the **Save recording**
-card is offered again if the screen was rotating while it opened.
+Both modes work in **portrait and landscape**. The panel, the blinking dot and the **✕** button are placed with a gravity
+(a corner, under the dot) instead of fixed coordinates, so they follow the rotation.
 
 ## 4. Saving a recording
 
-When a recording ends, the **Save recording** card opens above the app you are in:
+A recording is **saved automatically** when you tap the ✕:
 
-- the subtitle tells you what was captured — **12 taps**, **1 gesture**, …;
-- the proposed name is `Recording 2026-11-11 22:16`, and it can be changed later in the app (**Rename**);
-- **SAVE** stores the template right away and **PLAY** will replay it, **DISCARD** throws the recording away.
+- what was captured is stored right away under the name `Recording 2026-11-11 22:16`, and **PLAY** replays it;
+- the name can be changed later in the app (**Rename**);
+- if nothing was captured, nothing is saved and the app says **No taps recorded**.
 
 A brand new template plays **once**. How many times it must play is chosen when you play it, with the **×N** button
-(§6) — nothing to decide while saving.
+(§6) — nothing to decide while recording.
 
 ## 5. Playing a macro
 
 - **PLAY** on the panel: plays the template that was played last.
 - **≡** on the panel: shows every template, tap one (or its ▶) to play it.
-- While a macro plays, the panel stays visible so you can press **STOP** at any moment.
+- While a macro plays, a **green frame** outlines the whole screen and the panel stays visible so you can press **STOP**
+  at any moment. **Touching the screen also stops the playback** immediately (and so does turning the screen off).
 
 A macro replays **exactly** what was recorded: if the last action clears the screen (for instance `AC` on a calculator),
 the screen looks unchanged after the replay — that is expected, the macro did run.
@@ -114,11 +122,12 @@ Press **PLAY** in the card to start with those settings. The choice is **stored 
 (from the panel or from the app) uses it, even after a restart. The **×N** button always shows the current choice
 (`1×`, `5×`, `∞`).
 
-**∞ (endless)** plays the macro over and over until one of these happens:
+Any macro — **including a single run** — stops as soon as one of these happens:
 
 - you press **STOP** on the panel, or
 - you **touch the screen** — a one pixel watcher stops the macro at the first real finger touch. The clicks the macro
-  injects itself are ignored, and so are taps on the panel itself.
+  injects itself are ignored, and so are taps on the panel itself,
+- the screen turns off (a power press that switches the screen off, or the lock screen).
 
 > **Use a pause when you repeat.** Most apps ignore a second click that lands less than ~100 ms after the first one. With
 > `0 s` a repeated macro can look like it does nothing in a calculator or a form: choose `0,5 s` or `1 s`.
@@ -128,8 +137,13 @@ Press **PLAY** in the card to start with those settings. The choice is **stored 
 The app lists your templates **newest first**: the one you just recorded is on top. Each row shows its name, its number
 of actions and its repeat setting (`1 action(s) · 5×`, `9 action(s) · ∞`) and offers:
 
+- **📌 Pin / Unpin** — a pinned template is protected from the automatic cleanup (see below);
 - **Rename** — give it a meaningful name;
-- **Delete** — remove it for good (not possible while a macro is playing).
+- **Delete** — remove it for good (not possible while a macro is playing). Pinned templates can still be deleted by hand.
+
+Only **five unpinned templates** are kept: saving a sixth removes the oldest unpinned one. Pinned templates do not count
+towards this limit, and unpinning a template that is older than the five newest unpinned ones removes it on the spot.
+The template currently selected for playback is never removed automatically.
 
 Playing and repeating are done from the floating panel, so the app stays a simple library.
 
@@ -139,7 +153,7 @@ Playing and repeating are done from the floating panel, so the app stays a simpl
   and layout, and bring it to the front before pressing PLAY. Recording on one device and playing on another will not
   work.
 - Tap recording takes the **centre of the tapped view**, so a tap on a large list row replays in the middle of the row.
-  Taps on a surface that no view handles (a canvas game) are not recorded.
+  Taps on a surface that no view handles (a canvas game) switch the recording to a relay that captures them exactly.
 - A recording that was made with AutoClicky **1.2.3 or older** may contain wrong tap positions: record it again.
 - Gesture mode blocks the app underneath by design.
 - The accessibility service reconnects after a reboot only once the phone has been unlocked for the first time.

@@ -26,7 +26,6 @@ import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
-import android.widget.Button
 
 /**
  * Records full gestures (taps, long presses, swipes and multi-finger gestures) on a dimmed overlay covering the screen.
@@ -43,9 +42,9 @@ class GestureRecordingOverlay(
     private val windowManager: WindowManager? = service.getSystemService(WindowManager::class.java)
 
     private var captureView: View? = null
-    private var stopButton: Button? = null
 
     private val indicator = RecordingIndicator(service = service)
+    private val stopControl = RecordingStopControl(service = service, onStopRequested = onStopRequested)
 
     fun start() {
         val windowManager = windowManager ?: return
@@ -66,30 +65,19 @@ class GestureRecordingOverlay(
             }
         }
 
-        if (stopButton == null) {
-            val button = Button(service).apply {
-                text = "Stop"
-                setOnClickListener { onStopRequested() }
-            }
-
-            if (addView(windowManager, button, stopButtonLayoutParams())) {
-                stopButton = button
-            }
-        }
+        stopControl.show()
 
         indicator.show()
     }
 
     fun stop() {
         indicator.hide()
+        stopControl.hide()
 
         val windowManager = windowManager ?: return
 
         captureView?.let { view -> removeView(windowManager, view) }
         captureView = null
-
-        stopButton?.let { view -> removeView(windowManager, view) }
-        stopButton = null
     }
 
     private fun addView(windowManager: WindowManager, view: View, params: WindowManager.LayoutParams): Boolean =
@@ -121,20 +109,7 @@ class GestureRecordingOverlay(
             gravity = Gravity.TOP or Gravity.START
         }
 
-    private fun stopButtonLayoutParams(): WindowManager.LayoutParams =
-        WindowManager.LayoutParams(
-            WindowManager.LayoutParams.WRAP_CONTENT,
-            WindowManager.LayoutParams.WRAP_CONTENT,
-            WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
-            PixelFormat.TRANSLUCENT,
-        ).apply {
-            gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
-            y = STOP_BUTTON_MARGIN_BOTTOM_PX
-        }
-
     private companion object {
         const val OVERLAY_COLOR = 0x33000000
-        const val STOP_BUTTON_MARGIN_BOTTOM_PX = 250
     }
 }

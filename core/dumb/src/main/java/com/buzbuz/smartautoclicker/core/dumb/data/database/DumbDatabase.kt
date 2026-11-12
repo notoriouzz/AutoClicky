@@ -50,7 +50,7 @@ abstract class DumbDatabase : RoomDatabase() {
 }
 
 /** Current version of the database. */
-const val DUMB_DATABASE_VERSION = 3
+const val DUMB_DATABASE_VERSION = 4
 
 const val DUMB_SCENARIO_TABLE = "dumb_scenario_table"
 const val DUMB_ACTION_TABLE = "dumb_action_table"

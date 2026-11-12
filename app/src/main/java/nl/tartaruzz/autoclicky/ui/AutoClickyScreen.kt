@@ -173,6 +173,15 @@ fun AutoClickyScreen(
             ScenarioRow(
                 scenario = scenario,
                 enabled = !isRunning,
+                onTogglePin = {
+                    coroutineScope.launch {
+                        try {
+                            engineController.setScenarioPinned(scenario, pinned = !scenario.pinned)
+                        } catch (e: Exception) {
+                            message = "Cannot change the pin of this template: ${e.message}"
+                        }
+                    }
+                },
                 onRename = {
                     renameName = scenario.name
                     renameTarget = scenario

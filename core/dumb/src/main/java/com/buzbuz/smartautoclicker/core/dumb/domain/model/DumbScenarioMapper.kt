@@ -34,6 +34,8 @@ internal fun DumbScenarioWithActions.toDomain(asDomain: Boolean = false): DumbSc
         dumbActions = dumbActions
             .sortedBy { it.action.priority }
             .map { dumbAction -> dumbAction.toDomain(asDomain) },
+        pinned = scenario.pinned,
+        createdAtMs = scenario.createdAtMs,
         stats = stats.toDomain(),
     )
 
@@ -46,6 +48,8 @@ internal fun DumbScenario.toEntity(): DumbScenarioEntity =
         maxDurationMin = maxDurationMin,
         isDurationInfinite = isDurationInfinite,
         randomize = randomize,
+        pinned = pinned,
+        createdAtMs = createdAtMs,
     )
 
 

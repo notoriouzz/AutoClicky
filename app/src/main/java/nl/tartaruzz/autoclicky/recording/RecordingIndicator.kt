@@ -34,7 +34,7 @@ import kotlin.math.roundToInt
 /**
  * The small blinking red dot displayed in a corner of the screen while a capture runs.
  *
- * It is the only "recording" marker left on purpose: the **Stop** button below is already there, so no text is needed.
+ * It is the only "recording" marker left on purpose: the ✕ button below is already there, so no text is needed.
  * The dot blinks slowly (fade in and out) so it catches the eye without covering anything, and its window is not
  * touchable: the app under it keeps working, which is required by the tap recording.
  *
@@ -51,7 +51,7 @@ internal class RecordingIndicator(
     private var blinkAnimator: ObjectAnimator? = null
 
     /** Attach the dot. Returns false when the window manager refused the window. */
-    fun show(): Boolean {
+    fun show(color: Int = INDICATOR_COLOR): Boolean {
         val windowManager = windowManager ?: return false
         if (indicatorView != null) return true
 
@@ -60,7 +60,7 @@ internal class RecordingIndicator(
         val dot = View(service).apply {
             background = GradientDrawable().apply {
                 shape = GradientDrawable.OVAL
-                setColor(INDICATOR_COLOR)
+                setColor(color)
                 setStroke(toPx(2), INDICATOR_RING_COLOR)
             }
         }

@@ -22,11 +22,11 @@ package nl.tartaruzz.autoclicky.recording
 import android.accessibilityservice.AccessibilityService
 import android.annotation.SuppressLint
 import android.graphics.PixelFormat
+import android.util.Log
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
-import android.widget.Button
 
 /**
  * Records taps performed by the user while they keep using their apps.
@@ -37,7 +37,8 @@ import android.widget.Button
  * detect user touches, see `UserTouchWatcher`.
  *
  * Only taps can be recorded this way: Android does not report duration, movement or additional fingers for touches
- * happening outside of the window.
+ * happening outside of the window. On a device that reports no position for these touches, and in an app that draws
+ * nothing accessible, nothing at all can be recorded: `RecordingController` then switches to `RelayRecordingOverlay`.
  */
 class TapRecordingOverlay(
     private val service: AccessibilityService,
@@ -48,9 +49,9 @@ class TapRecordingOverlay(
     private val windowManager: WindowManager? = service.getSystemService(WindowManager::class.java)
 
     private var watcherView: View? = null
-    private var stopButton: Button? = null
 
     private val indicator = RecordingIndicator(service = service)
+    private val stopControl = RecordingStopControl(service = service, onStopRequested = onStopRequested)
 
     fun start() {
         val windowManager = windowManager ?: return
@@ -60,12 +61,7 @@ class TapRecordingOverlay(
         if (watcherView == null) {
             @SuppressLint("ClickableViewAccessibility") // The view only receives the touches made outside of it.
             val view = View(service).apply {
-                setOnTouchListener { _, event ->
-                    if (event.actionMasked == MotionEvent.ACTION_OUTSIDE) {
-                        onTapRecorded(event.rawX, event.rawY, event.eventTime)
-                    }
-                    false
-                }
+                setOnTouchListener { _, event -> onWatcherTouchEvent(event) }
             }
 
             if (addView(windowManager, view, watcherLayoutParams())) {
@@ -73,28 +69,36 @@ class TapRecordingOverlay(
             }
         }
 
-        if (stopButton == null) {
-            val button = Button(service).apply {
-                text = "Stop"
-                setOnClickListener { onStopRequested() }
-            }
-
-            if (addView(windowManager, button, stopButtonLayoutParams())) {
-                stopButton = button
-            }
-        }
+        stopControl.show()
     }
 
     fun stop() {
         indicator.hide()
+        stopControl.hide()
 
         val windowManager = windowManager ?: return
 
         watcherView?.let { view -> removeView(windowManager, view) }
         watcherView = null
+    }
+    /**
+     * The system sends one `ACTION_OUTSIDE` per gesture made outside of the watcher window, while the app under the
+     * finger still receives the touch.
+     *
+     * Its coordinates are the screen ones on most devices, but some report `(0,0)` for every touch (Samsung): the event
+     * coordinates are then used, and `RecordingController` falls back to the click of the view that received the tap.
+     */
+    private fun onWatcherTouchEvent(event: MotionEvent): Boolean {
+        if (event.actionMasked != MotionEvent.ACTION_OUTSIDE) return false
 
-        stopButton?.let { view -> removeView(windowManager, view) }
-        stopButton = null
+        val hasRawCoordinates = event.rawX != 0f || event.rawY != 0f
+        val x = if (hasRawCoordinates) event.rawX else event.x
+        val y = if (hasRawCoordinates) event.rawY else event.y
+
+        Log.d(TAG, "Outside touch at ($x, $y), raw=(${event.rawX}, ${event.rawY})")
+        onTapRecorded(x, y, event.eventTime)
+
+        return false
     }
 
     private fun addView(windowManager: WindowManager, view: View, params: WindowManager.LayoutParams): Boolean =
@@ -130,20 +134,8 @@ class TapRecordingOverlay(
             gravity = Gravity.TOP or Gravity.START
         }
 
-    private fun stopButtonLayoutParams(): WindowManager.LayoutParams =
-        WindowManager.LayoutParams(
-            WindowManager.LayoutParams.WRAP_CONTENT,
-            WindowManager.LayoutParams.WRAP_CONTENT,
-            WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
-            PixelFormat.TRANSLUCENT,
-        ).apply {
-            gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
-            y = STOP_BUTTON_MARGIN_BOTTOM_PX
-        }
-
     private companion object {
         const val WATCHER_WINDOW_SIZE_PX = 1
-        const val STOP_BUTTON_MARGIN_BOTTOM_PX = 250
+        const val TAG = "TapRecordingOverlay"
     }
 }

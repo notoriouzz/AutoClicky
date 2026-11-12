@@ -21,7 +21,13 @@ package nl.tartaruzz.autoclicky.recording
 
 import android.view.MotionEvent
 
-/** Convert the raw motion events received by the recording overlays into [TouchSample]s. */
+/**
+ * Convert the raw motion events received by the recording overlays into [TouchSample]s.
+ *
+ * Positions are the screen ones ([getRawX]/[getRawY]), not the ones of the view: the engine replays a gesture at
+ * absolute screen coordinates, and a full screen overlay is not always anchored at the origin of the display (a status
+ * bar, a display cutout or the navigation bar can offset it).
+ */
 fun MotionEvent.toTouchSamples(): List<TouchSample> {
     val maskedAction = actionMasked
 
@@ -41,8 +47,8 @@ fun MotionEvent.toTouchSamples(): List<TouchSample> {
                         MotionEvent.ACTION_POINTER_DOWN -> TouchAction.DOWN
                         else -> TouchAction.UP
                     },
-                    x = getX(pointerIndex),
-                    y = getY(pointerIndex),
+                    x = getRawX(pointerIndex),
+                    y = getRawY(pointerIndex),
                     eventTimeMs = eventTime,
                 )
             )
@@ -52,8 +58,8 @@ fun MotionEvent.toTouchSamples(): List<TouchSample> {
             TouchSample(
                 pointerId = getPointerId(pointerIndex),
                 action = TouchAction.MOVE,
-                x = getX(pointerIndex),
-                y = getY(pointerIndex),
+                x = getRawX(pointerIndex),
+                y = getRawY(pointerIndex),
                 eventTimeMs = eventTime,
             )
         }
@@ -62,8 +68,8 @@ fun MotionEvent.toTouchSamples(): List<TouchSample> {
             TouchSample(
                 pointerId = getPointerId(pointerIndex),
                 action = TouchAction.CANCEL,
-                x = getX(pointerIndex),
-                y = getY(pointerIndex),
+                x = getRawX(pointerIndex),
+                y = getRawY(pointerIndex),
                 eventTimeMs = eventTime,
             )
         }

@@ -27,7 +27,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -52,15 +51,14 @@ import javax.inject.Singleton
  * It lets the user start a recording, stop a recording or a running template, and play the last template without going
  * back to the AutoClicky activity, which is what makes "perform an action in another app and record it" possible.
  *
- * It also owns the two dialogs the panel can open above the current app:
- * - [SaveRecordingOverlay], shown as soon as a capture ends, so the recording can be saved on the spot,
- * - [ScenarioPickerOverlay], listing the stored templates so one can be chosen and played from anywhere.
+ * It also owns the dialogs the panel can open above the current app: the scenario picker and the repeat choice. A capture
+ * is saved automatically when it ends, so no save dialog is needed anymore.
  *
  * Visibility rules:
  * - the user can pin the panel from the activity ([setPanelRequested], toggled by [toggle]),
  * - the panel appears on its own while a template is playing, so that it can be stopped from any app,
  * - the panel hides while an overlay is capturing the touches, because the recording overlays already provide their own
- *   "Stop recording" button.
+ *   ✕ button.
  *
  * The overlays need the running accessibility service, so [attach] is called by it on connection and [detach] on
  * unbinding, mirroring [RecordingController].
@@ -75,25 +73,22 @@ class QuickPanelController @Inject constructor(
 
     private var service: AccessibilityService? = null
     private var overlay: QuickPanelOverlay? = null
-    private var saveOverlay: SaveRecordingOverlay? = null
     private var pickerOverlay: ScenarioPickerOverlay? = null
     private var repeatOverlay: RepeatOverlay? = null
 
     private var stateJob: Job? = null
     private var completedRecordingJob: Job? = null
-    private var saveRetryJob: Job? = null
+    private var emptyNoticeJob: Job? = null
+    private var relayNoticeJob: Job? = null
 
     private var isVisibleRequested = false
     private var isDismissedForCurrentRun = false
     private var hasReportedPanelFailure = false
     private var lastState = PanelState()
 
-    /** The recording currently offered in [SaveRecordingOverlay], so it is not displayed twice. */
-    private var offeredRecording: CompletedRecording? = null
-
     /** True while one of the full screen cards is displayed; the panel is hidden during that time. */
     private val isCardOpen: Boolean
-        get() = saveOverlay != null || pickerOverlay != null || repeatOverlay != null
+        get() = pickerOverlay != null || repeatOverlay != null
 
     private val _isPanelRequested = MutableStateFlow(false)
 
@@ -123,11 +118,27 @@ class QuickPanelController @Inject constructor(
         completedRecordingJob?.cancel()
         completedRecordingJob = scope.launch {
             recordingController.completedRecording.collect { completed ->
-                if (completed == null) {
-                    // Saved or discarded: the next recording may be offered again.
-                    offeredRecording = null
-                } else if (completed !== offeredRecording) {
-                    showSaveOverlay(completed)
+                if (completed != null) saveRecording(completed)
+            }
+        }
+
+        emptyNoticeJob?.cancel()
+        emptyNoticeJob = scope.launch {
+            recordingController.recordingEmptyNotice.collect { isEmpty ->
+                if (isEmpty) {
+                    recordingController.acknowledgeEmptyRecording()
+                    showMessage("No taps recorded")
+                }
+            }
+        }
+
+        relayNoticeJob?.cancel()
+        relayNoticeJob = scope.launch {
+            recordingController.isForwardingTouches.collect { isForwarding ->
+                if (isForwarding) {
+                    // From now on every touch is received by AutoClicky and sent back to the app: the user must know,
+                    // because the app now reacts when they release instead of while they press.
+                    showMessage("$FORWARDED_CAPTURE_NOTICE")
                 }
             }
         }
@@ -140,16 +151,15 @@ class QuickPanelController @Inject constructor(
         stateJob = null
         completedRecordingJob?.cancel()
         completedRecordingJob = null
-        saveRetryJob?.cancel()
-        saveRetryJob = null
+        relayNoticeJob?.cancel()
+        relayNoticeJob = null
+        emptyNoticeJob?.cancel()
+        emptyNoticeJob = null
 
-        saveOverlay?.dismiss()
-        saveOverlay = null
         pickerOverlay?.dismiss()
         pickerOverlay = null
         repeatOverlay?.dismiss()
         repeatOverlay = null
-        offeredRecording = null
 
         overlay?.hide()
         overlay = null
@@ -173,14 +183,8 @@ class QuickPanelController @Inject constructor(
      */
     fun onConfigurationChanged() {
         overlay?.onScreenRotated()
-        saveOverlay?.onScreenRotated()
         repeatOverlay?.onScreenRotated()
         pickerOverlay?.onScreenRotated()
-
-        val pendingRecording = recordingController.completedRecording.value
-        if (pendingRecording != null && saveOverlay == null) {
-            showSaveOverlay(pendingRecording)
-        }
     }
 
     /** Pin or unpin the panel to the screen, from the activity. */
@@ -273,7 +277,7 @@ class QuickPanelController @Inject constructor(
         if (!recordingController.startTapCapture()) {
             showMessage("Cannot start the recording, is the accessibility service enabled?")
         } else {
-            showMessage("Recording TAPS — use your apps, then press STOP")
+            showMessage("Recording TAPS — use your apps, then tap ✕ to finish and save")
         }
     }
 
@@ -289,7 +293,7 @@ class QuickPanelController @Inject constructor(
         if (!recordingController.startGestureCapture()) {
             showMessage("Cannot start the recording, is the accessibility service enabled?")
         } else {
-            showMessage("Recording GESTURES — draw them on the screen, then press STOP")
+            showMessage("Recording GESTURES — draw them on the screen, then tap ✕ to finish and save")
         }
     }
 
@@ -403,67 +407,12 @@ class QuickPanelController @Inject constructor(
         }
     }
 
-    /** Offer the recording that was just captured, above the app the user is in. */
-    private fun showSaveOverlay(recording: CompletedRecording) {
-        if (attachSaveOverlay(recording)) return
-
-        showMessage("Cannot display the save dialog now, retrying")
-
-        // Adding a window can be refused while the display is rotating: keep trying for a moment, the recording is
-        // still pending (it is only consumed when it is saved).
-        saveRetryJob?.cancel()
-        saveRetryJob = scope.launch {
-            repeat(SAVE_OVERLAY_RETRY_COUNT) {
-                delay(SAVE_OVERLAY_RETRY_DELAY_MS)
-                if (attachSaveOverlay(recording)) return@launch
-            }
-        }
-    }
-
-    /**
-     * Build and attach the save card.
-     *
-     * @return false when the card is not displayed, for instance because the window manager refused the window during a
-     * rotation.
-     */
-    private fun attachSaveOverlay(recording: CompletedRecording): Boolean {
-        if (saveOverlay != null) return true
-
-        val service = service ?: return false
-
-        offeredRecording = recording
-
-        val overlay = SaveRecordingOverlay(
-            service = service,
-            summary = recording.summary,
-            recordingName = defaultRecordingName(),
-            onSave = { saveRecording(recording) },
-            onCancel = {
-                saveOverlay?.dismiss()
-                saveOverlay = null
-                applyState()
-            },
-        )
-        saveOverlay = overlay
-
-        if (!overlay.show()) {
-            saveOverlay = null
-            return false
-        }
-
-        applyState()
-        return true
-    }
-
+    /** Persist the recording that just ended, and make it the one PLAY starts. */
     private fun saveRecording(recording: CompletedRecording) {
-        saveOverlay?.dismiss()
-        saveOverlay = null
-        applyState()
-
         val templateName = defaultRecordingName()
 
         scope.launch {
-            // A new template plays once; the repeat is chosen with the ×N button when it is played.
+            // A new recording plays once; the repeat is chosen with the ×N button when it is played.
             val repeat = RepeatSetting.SINGLE
             engineController.setRepeatSetting(repeat)
 
@@ -478,7 +427,7 @@ class QuickPanelController @Inject constructor(
             if (scenarioId == null) {
                 showMessage("Could not save the recording")
             } else {
-                showMessage("Saved: $templateName (${recording.summary})")
+                showMessage("Recording saved")
             }
         }
     }
@@ -512,8 +461,11 @@ class QuickPanelController @Inject constructor(
     private companion object {
         const val TAG = "QuickPanelController"
 
-        /** How often the save card is retried when the window manager refuses it, and how long between two tries. */
-        const val SAVE_OVERLAY_RETRY_COUNT = 6
-        const val SAVE_OVERLAY_RETRY_DELAY_MS = 300L
+        /**
+         * Shown when the capture had to switch to the relay overlay: the app does not tell where its views are, so the
+         * taps are received by AutoClicky and sent back to it.
+         */
+        const val FORWARDED_CAPTURE_NOTICE =
+            "This app does not report where you tap: taps are now captured and forwarded to it, so they land a moment after you release"
     }
 }

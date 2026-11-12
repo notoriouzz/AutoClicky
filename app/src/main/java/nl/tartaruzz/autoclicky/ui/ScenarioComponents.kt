@@ -73,11 +73,12 @@ fun NameDialog(
     )
 }
 
-/** One stored template: its name, its repeat setting and the edition actions. */
+/** One stored template: its name, its repeat setting, the pin toggle and the edition actions. */
 @Composable
 fun ScenarioRow(
     scenario: DumbScenario,
     enabled: Boolean,
+    onTogglePin: () -> Unit,
     onRename: () -> Unit,
     onDelete: () -> Unit,
     modifier: Modifier = Modifier,
@@ -105,6 +106,16 @@ fun ScenarioRow(
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
+                TextButton(onClick = onTogglePin, enabled = enabled) {
+                    Text(
+                        text = if (scenario.pinned) "📌 Unpin" else "📌 Pin",
+                        color = if (scenario.pinned) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        },
+                    )
+                }
                 TextButton(onClick = onRename, enabled = enabled) {
                     Text("Rename")
                 }
