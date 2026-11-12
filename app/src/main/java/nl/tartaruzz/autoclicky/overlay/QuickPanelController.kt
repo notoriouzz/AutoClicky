@@ -173,6 +173,9 @@ class QuickPanelController @Inject constructor(
      */
     fun onConfigurationChanged() {
         overlay?.onScreenRotated()
+        saveOverlay?.onScreenRotated()
+        repeatOverlay?.onScreenRotated()
+        pickerOverlay?.onScreenRotated()
 
         val pendingRecording = recordingController.completedRecording.value
         if (pendingRecording != null && saveOverlay == null) {

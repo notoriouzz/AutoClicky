@@ -55,6 +55,9 @@ class SaveRecordingOverlay(
 
     private var rootView: FrameLayout? = null
 
+    /** The card itself, kept to re-layout it after a rotation. */
+    private var cardView: LinearLayout? = null
+
     /** Attach the card. Returns false when the window manager refused the window. */
     fun show(): Boolean {
         val windowManager = windowManager ?: return false
@@ -89,6 +92,8 @@ class SaveRecordingOverlay(
 
     /** Detach the card from the window manager. */
     fun dismiss() {
+        cardView = null
+
         val windowManager = windowManager ?: return
         val root = rootView ?: return
 
@@ -100,6 +105,29 @@ class SaveRecordingOverlay(
             // The view was already removed.
         }
     }
+
+    /**
+     * Re-layout the card after a rotation.
+     *
+     * Its width was computed for the previous orientation: a card built in landscape is wider than the portrait screen
+     * and would end up half outside of it. The new width is applied once the new configuration is in place.
+     */
+    fun onScreenRotated() {
+        val card = cardView ?: return
+
+        card.post {
+            val params = card.layoutParams as? FrameLayout.LayoutParams ?: return@post
+            params.width = cardWidthPx()
+            params.bottomMargin = toPx(CARD_BOTTOM_MARGIN_DP)
+            card.layoutParams = params
+            card.requestLayout()
+        }
+    }
+
+    private fun cardWidthPx(): Int = minOf(
+        (service.resources.displayMetrics.widthPixels * CARD_WIDTH_RATIO).toInt(),
+        toPx(CARD_MAX_WIDTH_DP),
+    )
 
     private fun buildRoot(): FrameLayout {
         val root = FrameLayout(service).apply {
@@ -113,10 +141,7 @@ class SaveRecordingOverlay(
             setPadding(toPx(20), toPx(18), toPx(20), toPx(18))
             background = roundedBackground(CARD_COLOR, 20)
             layoutParams = FrameLayout.LayoutParams(
-                minOf(
-                    (service.resources.displayMetrics.widthPixels * CARD_WIDTH_RATIO).toInt(),
-                    toPx(CARD_MAX_WIDTH_DP),
-                ),
+                cardWidthPx(),
                 FrameLayout.LayoutParams.WRAP_CONTENT,
             ).apply {
                 gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
@@ -124,6 +149,7 @@ class SaveRecordingOverlay(
             }
             isClickable = true
         }
+        cardView = card
 
         card.addView(
             TextView(service).apply {

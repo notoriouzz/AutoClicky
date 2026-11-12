@@ -54,6 +54,9 @@ class RepeatOverlay(
 
     private var rootView: FrameLayout? = null
 
+    /** The card itself, kept to re-layout it after a rotation. */
+    private var cardView: LinearLayout? = null
+
     private var repeatSetting: RepeatSetting = initialRepeat.sanitized()
 
     /** Attach the card. Returns false when the window manager refused the window. */
@@ -90,6 +93,8 @@ class RepeatOverlay(
 
     /** Detach the card from the window manager. */
     fun dismiss() {
+        cardView = null
+
         val windowManager = windowManager ?: return
         val root = rootView ?: return
 
@@ -101,6 +106,26 @@ class RepeatOverlay(
             // The view was already removed.
         }
     }
+
+    /**
+     * Re-layout the card after a rotation: its width was computed for the previous orientation.
+     */
+    fun onScreenRotated() {
+        val card = cardView ?: return
+
+        card.post {
+            val params = card.layoutParams as? FrameLayout.LayoutParams ?: return@post
+            params.width = cardWidthPx()
+            params.bottomMargin = toPx(CARD_BOTTOM_MARGIN_DP)
+            card.layoutParams = params
+            card.requestLayout()
+        }
+    }
+
+    private fun cardWidthPx(): Int = minOf(
+        (service.resources.displayMetrics.widthPixels * CARD_WIDTH_RATIO).toInt(),
+        toPx(CARD_MAX_WIDTH_DP),
+    )
 
     private fun buildRoot(): FrameLayout {
         val root = FrameLayout(service).apply {
@@ -117,10 +142,7 @@ class RepeatOverlay(
             setPadding(toPx(20), toPx(18), toPx(20), toPx(18))
             background = roundedBackground(CARD_COLOR, 20)
             layoutParams = FrameLayout.LayoutParams(
-                minOf(
-                    (service.resources.displayMetrics.widthPixels * CARD_WIDTH_RATIO).toInt(),
-                    toPx(CARD_MAX_WIDTH_DP),
-                ),
+                cardWidthPx(),
                 FrameLayout.LayoutParams.WRAP_CONTENT,
             ).apply {
                 gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
@@ -129,6 +151,7 @@ class RepeatOverlay(
             isClickable = true
             setOnClickListener { Log.d(TAG, "Touch on the card itself, nothing to do") }
         }
+        cardView = card
 
         card.addView(
             TextView(service).apply {

@@ -55,6 +55,9 @@ class ScenarioPickerOverlay(
 
     private var rootView: FrameLayout? = null
 
+    /** The scrolling list, to re-apply its height cap after a rotation. */
+    private var listView: ScrollView? = null
+
     /** Attach the picker. Returns false when the window manager refused the window. */
     fun show(): Boolean {
         val windowManager = windowManager ?: return false
@@ -193,13 +196,23 @@ class ScenarioPickerOverlay(
             addView(container)
 
             // Keep the list shorter than the screen, whatever the number of templates is.
-            post {
-                val maxHeight = (service.resources.displayMetrics.heightPixels * MAX_HEIGHT_RATIO).toInt()
-                if (container.height > maxHeight) {
-                    layoutParams = layoutParams.apply { height = maxHeight }
-                    requestLayout()
-                }
-            }
+            post { capListHeight(this) }
+        }.also { listView = it }
+    }
+
+    /** Re-apply the height cap after a rotation, the previous one was computed for the other orientation. */
+    fun onScreenRotated() {
+        val list = listView ?: return
+        list.post { capListHeight(list) }
+    }
+
+    private fun capListHeight(list: ScrollView) {
+        val container = list.getChildAt(0) ?: return
+        val maxHeight = (service.resources.displayMetrics.heightPixels * MAX_HEIGHT_RATIO).toInt()
+
+        if (container.height > maxHeight) {
+            list.layoutParams = list.layoutParams.apply { height = maxHeight }
+            list.requestLayout()
         }
     }
 
