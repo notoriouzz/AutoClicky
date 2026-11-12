@@ -27,17 +27,17 @@ every other app. This guide explains the two recording modes, how to save a macr
 | Button | What it does |
 |---|---|
 | **REC** | **Tap** = record taps. **Hold ~0,5 s** = record gestures (see §3). |
-| **STOP** | Stops the macro that is playing. A recording is stopped with the **✕** under the red dot. |
 | **PLAY** | Plays the template that was played last (the most recent one when nothing was played yet). |
 | **×N** | Opens the **Repeat** card: how many times to play the template and how long to wait between two passes (§6). |
 | **≡** | Opens the template list, to pick another template and play it. |
-| **X** | Hides the panel. It comes back on its own while a macro plays. |
+| **X** | Hides the panel. |
 
 The panel can be **dragged** with any of its buttons: hold a button and move the finger. A short press on that same
 button clicks it; holding it still triggers the alternative action of REC (gesture recording).
 
-The panel hides itself while you record and while a card (repeat, template list) is open — that is normal: those windows
-are full screen and need the taps.
+The panel hides itself while you record, while a macro plays (only the green frame and the ▶ glyph stay visible), and
+while a card (repeat, template list) is open — that is normal: those windows are full screen and need the taps. While a
+macro plays you stop it by **touching the screen**.
 
 ## 3. Recording: taps or gestures?
 
@@ -103,8 +103,10 @@ A brand new template plays **once**. How many times it must play is chosen when 
 
 - **PLAY** on the panel: plays the template that was played last.
 - **≡** on the panel: shows every template, tap one (or its ▶) to play it.
-- While a macro plays, a **green frame** outlines the whole screen and the panel stays visible so you can press **STOP**
-  at any moment. **Touching the screen also stops the playback** immediately (and so does turning the screen off).
+- While a macro plays, the floating panel hides itself. Two things stay visible: a **thin, slowly blinking green frame**
+  with a subtle glow around the whole screen, and a small **▶** glyph in the top corner as a visual indicator (it is not
+  tappable and lets touches pass through). **Touching the screen stops the playback** immediately — and so does turning
+  the screen off.
 
 A macro replays **exactly** what was recorded: if the last action clears the screen (for instance `AC` on a calculator),
 the screen looks unchanged after the replay — that is expected, the macro did run.
@@ -124,9 +126,8 @@ Press **PLAY** in the card to start with those settings. The choice is **stored 
 
 Any macro — **including a single run** — stops as soon as one of these happens:
 
-- you press **STOP** on the panel, or
 - you **touch the screen** — a one pixel watcher stops the macro at the first real finger touch. The clicks the macro
-  injects itself are ignored, and so are taps on the panel itself,
+  injects itself are ignored,
 - the screen turns off (a power press that switches the screen off, or the lock screen).
 
 > **Use a pause when you repeat.** Most apps ignore a second click that lands less than ~100 ms after the first one. With

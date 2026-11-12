@@ -39,8 +39,8 @@ import kotlin.math.roundToInt
 /**
  * Lets the user choose how many times the last template must be played, then starts it.
  *
- * Opened from the "×N" button of the floating panel. The endless choice runs the template until the STOP button is
- * pressed or until the screen is touched, which is handled by [TouchStopController].
+ * Opened from the "×N" button of the floating panel. The endless choice runs the template until the screen is touched,
+ * which is handled by [TouchStopController].
  */
 class RepeatOverlay(
     private val service: AccessibilityService,

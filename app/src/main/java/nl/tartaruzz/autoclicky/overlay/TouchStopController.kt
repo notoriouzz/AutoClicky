@@ -48,8 +48,8 @@ import javax.inject.Singleton
 /**
  * Stops a playing template as soon as the user touches the screen.
  *
- * Touching the screen is the natural way to interrupt a playback: the panel's STOP button is not always reachable, the
- * user may have hidden the panel or be in an app that draws over it. Unlike the panel, a touch can land anywhere.
+ * Touching the screen is the natural way to interrupt a playback: while a template runs the floating panel is hidden, so
+ * a touch is the only way to stop it and can land anywhere on the screen.
  *
  * The touch is observed with the same technique as the recorder: a one pixel, non touchable window flagged with
  * `FLAG_WATCH_OUTSIDE_TOUCH` receives an `ACTION_OUTSIDE` event for every gesture made outside of it, while the app

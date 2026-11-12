@@ -48,15 +48,15 @@ import javax.inject.Singleton
 /**
  * Drives the floating [QuickPanelOverlay], the minimal control bar displayed above every other app.
  *
- * It lets the user start a recording, stop a recording or a running template, and play the last template without going
- * back to the AutoClicky activity, which is what makes "perform an action in another app and record it" possible.
+ * It lets the user start a recording, save it with the ✕ button, and play the last template, all without going back to
+ * the AutoClicky activity, which is what makes "perform an action in another app and record it" possible.
  *
  * It also owns the dialogs the panel can open above the current app: the scenario picker and the repeat choice. A capture
  * is saved automatically when it ends, so no save dialog is needed anymore.
  *
  * Visibility rules:
  * - the user can pin the panel from the activity ([setPanelRequested], toggled by [toggle]),
- * - the panel appears on its own while a template is playing, so that it can be stopped from any app,
+ * - the panel hides while a template is playing: only the green frame and the play glyph are shown then,
  * - the panel hides while an overlay is capturing the touches, because the recording overlays already provide their own
  *   ✕ button.
  *
@@ -82,7 +82,6 @@ class QuickPanelController @Inject constructor(
     private var relayNoticeJob: Job? = null
 
     private var isVisibleRequested = false
-    private var isDismissedForCurrentRun = false
     private var hasReportedPanelFailure = false
     private var lastState = PanelState()
 
@@ -165,7 +164,6 @@ class QuickPanelController @Inject constructor(
         overlay = null
         service = null
 
-        isDismissedForCurrentRun = false
         lastState = PanelState()
     }
 
@@ -191,28 +189,18 @@ class QuickPanelController @Inject constructor(
     fun setPanelRequested(requested: Boolean) {
         isVisibleRequested = requested
         _isPanelRequested.value = requested
-        if (requested) {
-            isDismissedForCurrentRun = false
-        }
-
         applyState()
     }
 
     private fun onPanelState(state: PanelState) {
-        // Once the engine stopped, the next run may show the panel again.
-        if (!state.isRunning) {
-            isDismissedForCurrentRun = false
-        }
-
         lastState = state
         applyState()
     }
 
     private fun applyState() {
         val state = lastState
-        // A card is a full screen window of its own: the panel would sit above it and swallow the taps meant for it.
-        val shouldBeVisible = !state.isRecording && !isCardOpen &&
-            (isVisibleRequested || (state.isRunning && !isDismissedForCurrentRun))
+        // The panel is hidden while the engine plays: only the green frame and the play glyph mark the playback.
+        val shouldBeVisible = !state.isRecording && !state.isRunning && !isCardOpen && isVisibleRequested
 
         if (state.isRecording) {
             // The picker would sit on top of the capture overlay and cannot play anything during a capture.
@@ -236,7 +224,6 @@ class QuickPanelController @Inject constructor(
 
         overlay?.setEnabledState(
             canRecord = !state.isRunning && !state.isRecording,
-            canStop = state.isRunning || state.isRecording,
             canPlay = state.hasScenarios && !state.isRunning && !state.isRecording,
             canRepeat = state.hasScenarios && !state.isRecording,
             canList = !state.isRecording,
@@ -256,7 +243,6 @@ class QuickPanelController @Inject constructor(
             service = service,
             onRecordClicked = ::onRecordClicked,
             onRecordGestureClicked = ::onRecordGestureClicked,
-            onStopClicked = ::onStopClicked,
             onPlayClicked = ::onPlayClicked,
             onRepeatClicked = ::onRepeatClicked,
             onListClicked = ::onListClicked,
@@ -294,14 +280,6 @@ class QuickPanelController @Inject constructor(
             showMessage("Cannot start the recording, is the accessibility service enabled?")
         } else {
             showMessage("Recording GESTURES — draw them on the screen, then tap ✕ to finish and save")
-        }
-    }
-
-    private fun onStopClicked() {
-        if (recordingController.isRecording.value) {
-            recordingController.stopCapture()
-        } else {
-            engineController.stopScenario()
         }
     }
 
@@ -435,11 +413,6 @@ class QuickPanelController @Inject constructor(
     private fun onHideClicked() {
         isVisibleRequested = false
         _isPanelRequested.value = false
-
-        if (lastState.isRunning) {
-            isDismissedForCurrentRun = true
-        }
-
         applyState()
     }
 

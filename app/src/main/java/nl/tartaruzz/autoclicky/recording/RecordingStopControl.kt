@@ -20,15 +20,15 @@
 package nl.tartaruzz.autoclicky.recording
 
 import android.accessibilityservice.AccessibilityService
+import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.Paint
 import android.graphics.PixelFormat
-import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.view.Gravity
 import android.view.View
 import android.view.WindowManager
 import android.widget.FrameLayout
-import android.widget.TextView
 
 import kotlin.math.roundToInt
 
@@ -105,16 +105,34 @@ internal class RecordingStopControl(
         }
     }
 
-    private fun buildGlyph(): TextView = TextView(service).apply {
-        text = "\u2715"
-        setTextColor(Color.WHITE)
-        textSize = GLYPH_TEXT_SIZE_SP
-        typeface = Typeface.DEFAULT_BOLD
-        gravity = Gravity.CENTER
-        includeFontPadding = false
-        background = GradientDrawable().apply {
-            shape = GradientDrawable.OVAL
-            setColor(GLYPH_BACKGROUND_COLOR)
+    /**
+     * The ✕ glyph, drawn as two crossing lines centred in the view.
+     *
+     * A font glyph would depend on the font metrics and never be perfectly centred, which would visibly shift the ✕
+     * relative to the dot above it. Drawing it keeps the centre of the glyph exactly on the centre of the dot.
+     */
+    private fun buildGlyph(): View {
+        val strokePx = GLYPH_STROKE_WIDTH_DP * service.resources.displayMetrics.density
+        val paint = Paint().apply {
+            color = GLYPH_COLOR
+            strokeWidth = strokePx
+            strokeCap = Paint.Cap.ROUND
+            isAntiAlias = true
+        }
+
+        return object : View(service) {
+            override fun onDraw(canvas: Canvas) {
+                super.onDraw(canvas)
+
+                val pad = width * GLYPH_INSET_RATIO
+                canvas.drawLine(pad, pad, width - pad, height - pad, paint)
+                canvas.drawLine(width - pad, pad, pad, height - pad, paint)
+            }
+        }.apply {
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.OVAL
+                setColor(GLYPH_BACKGROUND_COLOR)
+            }
         }
     }
 
@@ -124,13 +142,14 @@ internal class RecordingStopControl(
         val GLYPH_BACKGROUND_COLOR: Int = Color.parseColor("#B3242424")
         val GLYPH_COLOR: Int = Color.WHITE
 
-        /** Same values as [RecordingIndicator], so the ✕ sits right under the dot. */
+        /** Same values as [RecordingIndicator], so the ✕ sits right under the dot and is centred on it. */
         const val INDICATOR_SIZE_DP = 18
         const val CORNER_MARGIN_DP = 24
         const val GAP_DP = 6
 
         const val TOUCH_SIZE_DP = 48
         const val GLYPH_SIZE_DP = 24
-        const val GLYPH_TEXT_SIZE_SP = 16f
+        const val GLYPH_STROKE_WIDTH_DP = 2.5f
+        const val GLYPH_INSET_RATIO = 0.25f
     }
 }

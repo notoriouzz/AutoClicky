@@ -18,14 +18,15 @@ template library are specific to AutoClicky.
   apps, in order, at their real screen coordinates. When the app does not report them (a game, a video, a device that
   reports no touch position) the capture switches on its own to a relay overlay that receives the touches and sends them
   back to the app, so recording works everywhere instead of silently doing nothing.
-- **Floating panel above every app** — a small draggable **REC / STOP / PLAY / ×N / LIST / X** bar
+- **Floating panel above every app** — a small draggable **REC / PLAY / ×N / LIST / X** bar
   (`TYPE_ACCESSIBILITY_OVERLAY`) stays on top of the app you are using: record a macro, save it automatically, and replay
   any stored template — all without going back to AutoClicky. It appears on its own while a template is playing.
 - **Save where you are** — a recording is saved as soon as you tap the ✕ under the red dot, with a **Recording saved**
   toast (or **No taps recorded** when nothing was captured). No card, no naming: **PLAY** replays it right away. A new
   template plays once; set the repeat with **×N** when you play it.
 - **Repeat** — play a macro once, 3×, 5×, 10×, 50× or endlessly, with a pause between the passes. The choice is stored in
-  the template. A green frame outlines the whole screen while it plays, and **touching the screen stops it immediately**.
+  the template. A thin, slowly blinking **green frame** (with a subtle glow) and a small play glyph mark the playback;
+  the floating panel hides itself and **touching the screen stops it immediately**.
 - **Templates** — every recording is stored in a Room database and listed in the app, where it can be pinned, renamed or
   deleted. At most five **unpinned** recordings are kept: saving a sixth removes the oldest unpinned one, pinned
   recordings are never removed automatically. The template list is also one tap away on the floating panel.
@@ -135,7 +136,7 @@ be recorded or replayed.
 ### Recording and replaying from the floating panel
 
 Tap **Show floating panel** in the main screen (the panel also appears on its own while a template runs). A small
-draggable bar with **REC / STOP / PLAY / ×N / LIST / X** then stays above every other app:
+draggable bar with **REC / PLAY / ×N / LIST / X** then stays above every other app:
 
 1. **REC** — starts a **tap** recording: open any app, tap what you want to replay, then tap the **✕** under the blinking
    red dot. The recording is saved on the spot and **PLAY** will replay it.
@@ -144,7 +145,8 @@ draggable bar with **REC / STOP / PLAY / ×N / LIST / X** then stays above every
    underneath cannot be used while this mode is active (the overlay swallows the touches).
 3. A new template plays **once**; set the repeat with **×N** when you play it.
 4. **PLAY** — replays the template that was played last (the first one when none was played yet) above the app you are
-   in. A **green frame** outlines the whole screen while it runs.
+   in. While it runs, a thin, slowly blinking **green frame** with a subtle glow outlines the whole screen and a small
+   **▶** glyph marks the playback; the floating panel hides itself.
 5. **LIST** — opens the template list above the current app: tap a row (or its ▶) to play that template.
 6. **×N** — opens the **Repeat** card for the last template: choose how many times it must be played
    (1× / 3× / 5× / 10× / 50× / **∞**) and how long the engine waits between two passes (0 s / 0.5 s / 1 s / 3 s / 10 s),
@@ -152,16 +154,16 @@ draggable bar with **REC / STOP / PLAY / ×N / LIST / X** then stays above every
    app) uses the same repeat. The button label always shows the current choice (`5×`, `∞`).
 
 While a template plays, **touching the screen stops it immediately** (a one pixel pass-through watcher detects the
-finger). The gestures the engine injects itself are ignored (they carry no tool type, unlike a real touch), and so are
-the touches on the AutoClicky panel and cards. The screen turning off also stops the playback.
+finger). The gestures the engine injects itself are ignored (they carry no tool type, unlike a real touch). The screen
+turning off also stops the playback.
 
 A repeat needs a pause between the passes for most apps: two taps 50 ms apart are usually collapsed by the target app —
 set at least `0.5 s`/`1 s` when the template ends on a button of a calculator or of a form.
 
-**STOP** stops a recording or a running template, **X** hides the panel for the current run. While a template runs, the
-panel stays visible (with the running template's name in the list) so it can be stopped from any app.
+**STOP** stops a recording or a running template, **X** hides the panel. While a template runs, the panel hides itself —
+only the green frame and the play glyph remain — and it comes back, touchable again, as soon as the playback ends.
 
-The panel is hidden while a capture overlay is active (both recording modes already show their own **Stop**
+The panel is also hidden while a capture overlay is active (both recording modes already show their own **✕**
 button) and comes back as soon as the capture ends.
 
 ## How the recording works
